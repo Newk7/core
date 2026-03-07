@@ -1,0 +1,38 @@
+[project]
+name = "core"
+version = "0.1.0"
+description = "BizTool Core - task pipeline, document processing, and REST API"
+readme = "README.md"
+requires-python = ">=3.11"
+license-files = ["LICENSE"]
+
+dependencies = [
+    "boto3",
+    "docling",
+    "fastapi",
+    "fastparquet",
+    "huggingface_hub",
+    "pandas",
+    "pillow",
+    "psycopg2-binary",
+    "pydantic",
+    "pytesseract",
+    "python-multipart",
+    "requests",
+    "ujson",
+    "uvicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.setuptools]
+packages = [
+    "core",
+]

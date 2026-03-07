@@ -1,0 +1,33 @@
+# Open WebUI - running on the EC2 build host behind nginx
+# Based on aic/stack/oweb pattern
+# TODO: update domain and env vars once domain is acquired
+
+services:
+  oweb:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: biz-tool-oweb
+    hostname: biz-tool-oweb
+    restart: unless-stopped
+    ports:
+      - "9322:8080"
+    environment:
+      - WEBUI_NAME=BizTool AI
+      - ENABLE_OLLAMA_API=False
+      - ENABLE_OAUTH_SIGNUP=True
+      - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=True
+      - CORS_ALLOW_ORIGIN=${OWEB_CORS_ALLOW_ORIGIN:-*}
+      - PORT=8080
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL}
+      - WEBUI_SECRET_KEY=${OWEB_SECRET_KEY}
+      - JWT_EXPIRES_IN=${OWEB_JWT_EXPIRES_IN:--1}
+      - DATABASE_URL=${OWEB_DATABASE_URL:-sqlite:///app/backend/data/webui.db}
+    volumes:
+      - oweb-data:/app/backend/data
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+volumes:
+  oweb-data:
+    driver: local

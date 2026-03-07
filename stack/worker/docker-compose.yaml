@@ -1,0 +1,21 @@
+services:
+  worker:
+    build:
+      context: ../../
+      dockerfile: stack/worker/Dockerfile
+    container_name: biz-tool-worker
+    hostname: biz-tool-worker
+    restart: unless-stopped
+    environment:
+      - ENV_NAME=${ENV_NAME:-prod}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - POSTGRES_TASK_USER=${POSTGRES_TASK_USER}
+      - POSTGRES_TASK_PW=${POSTGRES_TASK_PW}
+      - POSTGRES_TASK_FQDN=${POSTGRES_TASK_FQDN:-biz-tool-postgres}
+      - POSTGRES_TASK_PORT=${POSTGRES_TASK_PORT:-5432}
+      - POSTGRES_TASK_DB_NAME=${POSTGRES_TASK_DB_NAME:-biztool}
+      - TASK_BUCKET=${TASK_BUCKET}
+      - DB_ENABLED=${DB_ENABLED:-1}
+      - S3_ENABLED=${S3_ENABLED:-1}
+    extra_hosts:
+      - host.docker.internal:host-gateway

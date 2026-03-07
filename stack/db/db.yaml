@@ -1,0 +1,27 @@
+# Postgres task database - docker-compose config for running on the EC2 host
+# This is NOT a CloudFormation template - it runs directly on the build host
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: biz-tool-postgres
+    hostname: biz-tool-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-biztool}
+      - POSTGRES_USER=${POSTGRES_USER:-biztool}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-biztool} -d ${POSTGRES_DB:-biztool}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local

@@ -1,0 +1,30 @@
+{
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.lintOnSave": true,
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportUnusedExpression": "none",
+    "reportUnusedImport": "none",
+    "reportUnusedFunction": "none",
+    "reportUnusedVariable": "none"
+  },
+  "pyright.inlayHints.functionReturnTypes": false,
+  "pyright.inlayHints.variableTypes": false,
+  "pyright.inlayHints.parameterTypes": false,
+  "typescript.showUnused": false,
+  "javascript.showUnused": false,
+  "coc.preferences.formatOnType": true,
+  "coc.preferences.useQuickfixForLocations": true,
+  "diagnostic.enable": true,
+  "diagnostic.enableSign": true,
+  "diagnostic.showUnused": false,
+  "diagnostic.enableHighlightLineNumber": true,
+  "diagnostic.errorSign": "💩",
+  "diagnostic.warningSign": "🤕",
+  "diagnostic.infoSign": "🤔",
+  "diagnostic.hintSign": "🔍",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "suggest.autoTrigger": "none"
+}

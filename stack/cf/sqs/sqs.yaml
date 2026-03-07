@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SQS queues for task processing pipeline - tasks are published with UUIDs and consumed by workers
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+  VisibilityTimeoutSeconds:
+    Type: Number
+    Default: 300
+    Description: Time (seconds) a message is invisible after being received (should exceed max task processing time)
+
+  MessageRetentionSeconds:
+    Type: Number
+    Default: 1209600
+    Description: Time (seconds) messages are retained (default 14 days)
+
+  MaxReceiveCount:
+    Type: Number
+    Default: 3
+    Description: Number of receive attempts before sending to DLQ
+
+Resources:
+  # Main task queue - workers poll this for new task UUIDs
+  TaskQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "biz-tool-${Environment}-task-queue"
+      VisibilityTimeout: !Ref VisibilityTimeoutSeconds
+      MessageRetentionPeriod: !Ref MessageRetentionSeconds
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt TaskDeadLetterQueue.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Dead letter queue for failed task messages
+  TaskDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "biz-tool-${Environment}-task-dlq"
+      MessageRetentionPeriod: 1209600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Result notification queue - workers publish completion status here
+  ResultQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "biz-tool-${Environment}-result-queue"
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: !Ref MessageRetentionSeconds
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ResultDeadLetterQueue.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  ResultDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "biz-tool-${Environment}-result-dlq"
+      MessageRetentionPeriod: 1209600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Policy allowing the EC2 host role to interact with queues
+  SQSAccessPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TaskQueue
+        - !Ref ResultQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowEC2RoleSQSAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+            Resource:
+              - !GetAtt TaskQueue.Arn
+              - !GetAtt ResultQueue.Arn
+
+Outputs:
+  TaskQueueURL:
+    Description: URL of the task queue
+    Value: !Ref TaskQueue
+
+  TaskQueueArn:
+    Description: ARN of the task queue
+    Value: !GetAtt TaskQueue.Arn
+
+  TaskDLQURL:
+    Description: URL of the task dead letter queue
+    Value: !Ref TaskDeadLetterQueue
+
+  ResultQueueURL:
+    Description: URL of the result queue
+    Value: !Ref ResultQueue
+
+  ResultQueueArn:
+    Description: ARN of the result queue
+    Value: !GetAtt ResultQueue.Arn
+
+  ResultDLQURL:
+    Description: URL of the result dead letter queue
+    Value: !Ref ResultDeadLetterQueue
