@@ -1,24 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation template to launch an Ubuntu 24.04 EC2 instance
+Description: CloudFormation template to launch an Amazon Linux 2023 EC2 instance
 
 Parameters:
-  Label:
-    Description: Tracking label for the AWS assets deployed across multiple stacks and usually unique to a region
-    Type: String
-    Default: kbaas
-  TSize:
-    Description: Size of the assets under the Label tracking tag
-    Type: String
-    Default: small
   Region:
     Description: AWS Region name
     Type: String
-    Default: us-east-2
-
-  InstanceNumber:
-    Type: String
-    Description: The number of the ec2 instance
-    Default: "1"
+    Default: us-east-1
 
   InstanceName:
     Type: String
@@ -27,17 +14,19 @@ Parameters:
   EC2Type:
     Description: EC2 instance type
     Type: String
-    # Default: m6i.xlarge
-    Default: g6e.xlarge
+    Default: t3.medium
 
   VPCID:
     Type: AWS::EC2::VPC::Id
     Description: The VPC to launch the instance in.
-    Default: vpc-05b34a6708360fbd0
+    Default: vpc-0dd28884da7e4d4eb
   SubnetId:
     Type: AWS::EC2::Subnet::Id
+    # Prerequisites for public access:
+    # 1. Subnet must have "Auto-assign public IPv4 address" enabled (MapPublicIpOnLaunch: true)
+    # 2. Subnet's route table must have a route: 0.0.0.0/0 -> Internet Gateway (IGW)
     Description: The public subnet to launch the instance in.
-    Default: subnet-022317cbbe0a19170
+    Default: subnet-0531a7a14eef69db2
 
   IsPublic:
     Type: String
@@ -47,202 +36,54 @@ Parameters:
       - "false"
     Description: Set to true to assign a public IP address.
 
-  KeyName:
-    Type: String
-    Description: Key Pair Name - Not used ATM
-    Default: ""
-
   IngressCIDR:
     Type: String
-    Description: The CIDR block allowed for RDP access (e.g., 203.0.113.0/32).
-    Default: 108.51.30.115/32
+    Description: The CIDR block allowed for HTTP/HTTPS/SSH access.
+    Default: 96.231.57.192/32
+
+  IngressCIDR1:
+    Type: String
+    Description: The CIDR block allowed for HTTP/HTTPS/SSH access.
+    Default: 71.56.174.247/32
 
 Resources:
-  IAMPolicyECAccess:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-managedpolicy.html
-      # ManagedPolicyName capped at 128 characters
-      ManagedPolicyName: !Sub "${Label}-${TSize}-${EC2Type}-${Region}-build-access"
-      Description: !Sub "Write access to any ssm s3 pipeline bucket location in the account, cloudformation read access for the entire account, read access to any stack buckets, iam server cert read access, and acm read access. EC2s need to be able to read from other stack buckets and ssm buckets to handle artifact pipelines copying tgz packages over named buckets. These IAMs could be further restricted in the future assuming there are already-working pipelines with a known promotion workflow e.g. dev -> integration -> uat -> production."
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowECRAuthTokenRead
-            Effect: Allow
-            Action:
-              - ecr:GetAuthorizationToken
-            Resource:
-              - "*"
-          - Sid: AllowECRRepoRead
-            Effect: Allow
-            Action:
-              - ecr:BatchGetImage
-              - ecr:BatchCheckLayerAvailability
-              - ecr:Describe*
-              - ecr:Get*
-              - ecr:List*
-            Resource:
-              - !Sub "arn:aws:ecr:${Region}:${AWS::AccountId}:repository/*"
-          - Sid: AllowS3List
-            Effect: Allow
-            Action:
-              - s3:List*
-            Resource:
-              - "*"
-          - Sid: AllowS3ReadStackBuckets
-            Effect: Allow
-            Action:
-              - s3:Get*
-              - s3:List*
-            Resource:
-              # allow reading from any stack or ssm bucket
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v0*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v1*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v2*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v3*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v4*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v5*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v6*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v7*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v8*/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-*-v9*/*"
-          - Sid: AllowS3WriteStackSSMBucket
-            Effect: Allow
-            Action:
-              - s3:*
-            Resource:
-              # allow writing to the stack's ssm bucket
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-${Label}-${TSize}-*-ssm/*/*/jobs/*/*/in/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-${Label}-${TSize}-*-ssm/*/*/jobs/*/*/out/*"
-              - !Sub "arn:aws:s3:::cp-${AWS::AccountId}-${Region}-${Label}-${TSize}-*-ssm/*/*/jobs/*/*/pipeline/*"
-          # needed for deploying service accounts into eks cluster(s)
-          - Sid: AllowReadServiceAccountsInRegion
-            Effect: Allow
-            Action:
-              - secretsmanager:Describe*
-              - secretsmanager:Get*
-              - secretsmanager:List*
-            Resource:
-              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:service/account/*"
-          - Sid: AllowReadingSecrets
-            Effect: Allow
-            Action:
-              - secretsmanager:Describe*
-              - secretsmanager:Get*
-              - secretsmanager:List*
-            Resource:
-              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Label}/*"
-          - Sid: AllowCFRead
-            Effect: Allow
-            Action:
-              - cloudformation:Describe*
-              - cloudformation:EstimateTemplateCost
-              - cloudformation:Get*
-              - cloudformation:List*
-              - cloudformation:ValidateTemplate
-              - cloudformation:Detect*
-            # any cf stack in any region (multi-account + multi-region)
-            Resource: "*"
-      # IAM Role Names
-  # IAMPolicyECAccess - end
-
-  EC2InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${Label}-${TSize}-${EC2Type}-${InstanceNumber}-${Region}-build-role"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ssm.amazonaws.com
-                - ec2.amazonaws.com
-                - ecs.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-        - arn:aws:iam::aws:policy/AmazonSSMDirectoryServiceAccess
-        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-        - arn:aws:iam::aws:policy/service-role/AmazonSSMAutomationRole
-        - !Ref IAMPolicyECAccess
-      Path: "/"
-      # inlined policies
-      Tags:
-        - Key: Name
-          Value: !Sub "${Label} - ${TSize} - ${EC2Type} - ${AWS::StackName} - ${Region} - build - instance-role"
-        - Key: region
-          Value: !Ref Region
-        - Key: vpc
-          Value: !Sub "${VPCID}"
-        # common for all stacks
-        - Key: label
-          Value: !Ref Label
-        - Key: tsize
-          Value: !Ref TSize
-  # EC2InstanceRole - end
-
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: !Sub "${Label}-${TSize}-${EC2Type}-${InstanceNumber}-${Region}-build-profile"
+      InstanceProfileName: !Sub "${Region}-ssm-profile"
       Path: "/"
       Roles:
-        - !Ref EC2InstanceRole
+        - ec2-ssm-role
   # EC2InstanceProfile - end
-
-  AutomationServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${Label}-${TSize}-${EC2Type}-${InstanceNumber}-${Region}-build-asr"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ssm.amazonaws.com
-                - ec2.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonSSMAutomationRole
-      Path: "/"
-      Policies:
-        - PolicyName: passrole
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - iam:PassRole
-                Resource:
-                  - !GetAtt EC2InstanceRole.Arn
-      Tags:
-        - Key: Name
-          Value: !Sub "${Label} - ${TSize} - ${EC2Type} - ${AWS::StackName} - ${Region} - build - automation-serivice-role"
-        - Key: region
-          Value: !Ref Region
-        - Key: vpc
-          Value: !Sub "${VPCID}"
-        # common for all stacks
-        - Key: label
-          Value: !Ref Label
-        - Key: tsize
-          Value: !Ref TSize
-  # AutomationServiceRole - end
 
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: test-build-access
-      GroupDescription: Allow access
+      GroupName: !Sub "biz-tool-host-sg"
+      GroupDescription: Allow HTTP, HTTPS, and SSH from my IP
       VpcId: !Ref VPCID
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: !Ref IngressCIDR
+          Description: SSH
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref IngressCIDR
+          Description: HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref IngressCIDR
+          Description: HTTPS
+        - IpProtocol: "-1"
+          CidrIp: !Ref IngressCIDR1
+          Description: All traffic
+      Tags:
+        - Key: Name
+          Value: !Sub "biz-tool-host-sg"
 
   Instance:
     Type: AWS::EC2::Instance
@@ -250,15 +91,11 @@ Resources:
       InstanceType: !Ref EC2Type
       IamInstanceProfile: !Ref EC2InstanceProfile
       ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", UseAMID]
-      # please use ssm instead of keypairs
-      # KeyName: !Ref KeyName
-      # subnetid and securitygroupids do not work on AWS::EC2::Instance
-      # SubnetId: !Ref SubnetId
-      # SecurityGroupIds:
-      # - !Ref SecurityGroup
       Tags:
         - Key: Name
           Value: !Ref InstanceName
+        - Key: region
+          Value: !Ref Region
       NetworkInterfaces:
         - AssociatePublicIpAddress: !If [IsPublicCondition, true, false]
           DeviceIndex: 0
@@ -266,73 +103,49 @@ Resources:
           GroupSet:
             - !Ref SecurityGroup
       BlockDeviceMappings:
-        - DeviceName: "/dev/sda1"
+        - DeviceName: "/dev/xvda"
           Ebs:
             VolumeType: "gp3"
             VolumeSize: "50"
             Iops: 3000
             Encrypted: true
             DeleteOnTermination: true
-        - DeviceName: "/dev/xvda"
-          Ebs:
-            VolumeType: "gp3"
-            VolumeSize: "100"
-            Iops: 3000
-            Encrypted: true
-            DeleteOnTermination: false
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -x
-          echo "starting build" > /tmp/._cloud_init.log
-          apt-get update
-          echo "starting update install" >> /tmp/._cloud_init.log
-          apt-get install -y ca-certificates curl wget procps dns-utils >> /tmp/._cloud_init.log 2>&1
-          apt-get install -y apt-utils aptitude apt-transport-https build-essential coreutils cmake dkms gcc git ca-certificates make ncdu virtualenv software-properties-common unzip
-          echo "mounting block devices" >> /tmp/._cloud_init.log 2>&1
-          mkdir -p -m 777 /data/xvda >> /tmp/._cloud_init.log 2>&1
-          mount /dev/xvda /data/xvda >> /tmp/._cloud_init.log 2>&1
-          ls -lrth /data/xvda >> /tmp/._cloud_init.log 2>&1
-          df -h /data/xvda >> /tmp/._cloud_init.log 2>&1
-          echo "showing attached block devices" >> /tmp/._cloud_init.log 2>&1
-          lsblk >> /tmp/._cloud_init.log 2>&1
-          echo "showing amazon ssm-agent running" >> /tmp/._cloud_init.log 2>&1
-          snap list amazon-ssm-agent >> /tmp/._cloud_init.log 2>&1
-          echo "starting python 3 install" >> /tmp/._cloud_init.log 2>&1
-          apt-get install -y python3 python3-apport python3-certifi python3-dev python3-docutils python3-pip python3-pygments python3-roman python3-setuptools python3-tk python3-venv >> /tmp/._cloud_init.log 2>&1
-          cd /tmp
-          pwd >> /tmp/._cloud_init.log 2>&1
-          curl 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip' >> /tmp/._cloud_init.log 2>&1
-          unzip awscliv2.zip >> /tmp/._cloud_init.log 2>&1
-          ./aws/install >> /tmp/._cloud_init.log 2>&1
-          rm -rf ./aws ./awscliv2.zip
-          echo "installing cuda deb" >> /tmp/._cloud_init.log 2>&1
-          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb >> /tmp/._cloud_init.log 2>&1
-          dpkg -i ./cuda-keyring_1.1-1_all.deb >> /tmp/._cloud_init.log 2>&1
-          apt-get update >> /tmp/._cloud_init.log 2>&1
-          echo "installing cuda toolkit" >> /tmp/._cloud_init.log 2>&1
-          apt-get -y install cuda-toolkit-12-8 >> /tmp/._cloud_init.log 2>&1
-          echo "installing cuda driver - nvidia-open" >> /tmp/._cloud_init.log 2>&1
-          apt-get install -y nvidia-open >> /tmp/._cloud_init.log 2>&1
-          rm ./cuda-keyring_1.1-1_all.deb >> /tmp/._cloud_init.log 2>&1
-          echo "installing docker - prep" >> /tmp/._cloud_init.log 2>&1
-          install -m 0755 -d /etc/apt/keyrings
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          chmod a+r /etc/apt/keyrings/docker.asc
-          echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu   noble stable' > /etc/apt/sources.list.d/docker.list
-          cat /etc/apt/sources.list.d/docker.list >> /tmp/._cloud_init.log 2>&1
-          apt-get update >> /tmp/._cloud_init.log 2>&1
-          echo "installing docker - ce" >> /tmp/._cloud_init.log 2>&1
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> /tmp/._cloud_init.log 2>&1
-          echo "testing docker" >> /tmp/._cloud_init.log 2>&1
+          echo "starting init" > /tmp/._cloud_init.log
+
+          # system update
+          dnf update -y >> /tmp/._cloud_init.log 2>&1
+
+          # install base utils
+          dnf install -y wget unzip git htop >> /tmp/._cloud_init.log 2>&1
+
+          # install docker
+          echo "installing docker" >> /tmp/._cloud_init.log
+          dnf install -y docker >> /tmp/._cloud_init.log 2>&1
+          systemctl enable docker >> /tmp/._cloud_init.log 2>&1
+          systemctl start docker >> /tmp/._cloud_init.log 2>&1
+          usermod -aG docker ec2-user >> /tmp/._cloud_init.log 2>&1
           docker ps -a >> /tmp/._cloud_init.log 2>&1
+          echo "docker installed" >> /tmp/._cloud_init.log
+
+          # install nginx
+          echo "installing nginx" >> /tmp/._cloud_init.log
+          dnf install -y nginx >> /tmp/._cloud_init.log 2>&1
+          systemctl enable nginx >> /tmp/._cloud_init.log 2>&1
+          systemctl start nginx >> /tmp/._cloud_init.log 2>&1
+          echo "nginx installed" >> /tmp/._cloud_init.log
+
+          echo "init complete" >> /tmp/._cloud_init.log
 
 Conditions:
   IsPublicCondition: !Equals [!Ref IsPublic, "true"]
 
 Mappings:
   RegionMap:
-    us-east-2:
-      UseAMID: ami-0ddc3b6d555676f83
+    us-east-1:
+      UseAMID: ami-0c421724a94bba6d6
 
 Outputs:
   InstancePublicIP:
