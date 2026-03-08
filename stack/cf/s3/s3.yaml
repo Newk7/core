@@ -34,8 +34,6 @@ Resources:
             NoncurrentVersionTransitions:
               - StorageClass: STANDARD_IA
                 TransitionInDays: 30
-            NoncurrentVersionExpiration:
-              NoncurrentDays: 90
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -55,7 +53,6 @@ Resources:
               - s3:GetObject
               - s3:PutObject
               - s3:ListBucket
-              - s3:DeleteObject
             Resource:
               - !Sub "${TaskDataBucket.Arn}"
               - !Sub "${TaskDataBucket.Arn}/*"
