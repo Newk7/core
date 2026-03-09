@@ -76,12 +76,32 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # Policy allowing the EC2 host role to interact with queues
-  SQSAccessPolicy:
+  # Policy allowing the EC2 host role to interact with the task queue
+  TaskQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
         - !Ref TaskQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowEC2RoleSQSAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+            Resource: !GetAtt TaskQueue.Arn
+
+  # Policy allowing the EC2 host role to interact with the result queue
+  ResultQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
         - !Ref ResultQueue
       PolicyDocument:
         Version: "2012-10-17"
@@ -96,9 +116,7 @@ Resources:
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
               - sqs:GetQueueUrl
-            Resource:
-              - !GetAtt TaskQueue.Arn
-              - !GetAtt ResultQueue.Arn
+            Resource: !GetAtt ResultQueue.Arn
 
 Outputs:
   TaskQueueURL:
