@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AWS SES email identity for districtsolutions.ai.
+  Verifies the domain, enables DKIM signing, creates a configuration set
+  for delivery tracking, and grants the EC2 host role permission to send.
+
+  After deploying:
+  1. Add the 3 DKIM CNAME records to your DNS provider (see Outputs)
+  2. Request production access in SES console (out of sandbox)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+  DomainName:
+    Type: String
+    Default: districtsolutions.ai
+    Description: Domain to verify for sending email
+
+  EC2RoleName:
+    Type: String
+    Default: ec2-ssm-role
+    Description: IAM role used by the EC2 host (for SES send permissions)
+
+Resources:
+  # Domain identity - verifies ownership and enables DKIM
+  EmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+      DkimAttributes:
+        SigningEnabled: true
+      MailFromAttributes:
+        MailFromDomain: !Sub "mail.${DomainName}"
+        BehaviorOnMxFailure: USE_DEFAULT_VALUE
+
+  # Configuration set - tracks delivery metrics
+  ConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub "biz-tool-${Environment}"
+      DeliveryOptions:
+        TlsPolicy: REQUIRE
+      ReputationOptions:
+        ReputationMetricsEnabled: true
+      SendingOptions:
+        SendingEnabled: true
+      SuppressionOptions:
+        SuppressedReasons:
+          - BOUNCE
+          - COMPLAINT
+
+  # IAM policy granting the EC2 role permission to send email via SES
+  SESSendPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "biz-tool-${Environment}-ses-send"
+      Roles:
+        - !Ref EC2RoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowSESSend
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource:
+              - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${DomainName}"
+              - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/biz-tool-${Environment}"
+          - Sid: AllowSESGetIdentity
+            Effect: Allow
+            Action:
+              - ses:GetEmailIdentity
+            Resource:
+              - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${DomainName}"
+
+Outputs:
+  EmailIdentityArn:
+    Description: ARN of the verified email identity
+    Value: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${DomainName}"
+
+  ConfigurationSetName:
+    Description: Name of the SES configuration set
+    Value: !Ref ConfigurationSet
+
+  DkimDnsRecords:
+    Description: >
+      After deployment, go to SES console > Verified identities > districtsolutions.ai
+      to get the 3 DKIM CNAME records. Add them to your DNS provider:
+        Name: <token1>._domainkey.districtsolutions.ai  -> <token1>.dkim.amazonses.com
+        Name: <token2>._domainkey.districtsolutions.ai  -> <token2>.dkim.amazonses.com
+        Name: <token3>._domainkey.districtsolutions.ai  -> <token3>.dkim.amazonses.com
+    Value: "See SES console for DKIM CNAME values"
+
+  MailFromDnsRecords:
+    Description: >
+      Add these DNS records for custom MAIL FROM domain:
+        MX:  mail.districtsolutions.ai -> 10 feedback-smtp.us-east-1.amazonses.com
+        TXT: mail.districtsolutions.ai -> "v=spf1 include:amazonses.com ~all"
+    Value: !Sub "MX: mail.${DomainName} -> 10 feedback-smtp.${AWS::Region}.amazonses.com"
+
+  PostDeploySteps:
+    Description: Required manual steps after stack deployment
+    Value: >
+      1) Add 3 DKIM CNAME records to DNS (see SES console)
+      2) Add MAIL FROM MX + SPF TXT records to DNS
+      3) Request production access: SES console > Account dashboard > Request production access
+      4) Verify DNS propagation: aws ses get-email-identity --email-identity districtsolutions.ai

@@ -30,6 +30,12 @@ def handle_task(tk: Task, er: EngResources = None, verbose: bool = False):
             task_status, tk = run_shred(tk=tk, er=er, verbose=verbose)
             log.info(f'done shred tk.id: {tk.id} status: {tk.status} ds: "{tk.display_status}"')
 
+        elif job_type in ['contact']:
+            log.info(f'processing contact email tk.id: {tk.id}')
+            from core.jobs.send_contact_email import send_contact_email
+            send_contact_email(tk)
+            tk.pub_update(s=0, ds='contact email sent')
+
         elif job_type in ['chat']:
             log.info(f'processing chat tk.id: {tk.id}')
             # placeholder for LLM chat integration

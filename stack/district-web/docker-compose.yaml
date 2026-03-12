@@ -1,0 +1,16 @@
+services:
+  district-web:
+    build:
+      context: ../../frontend/district-web
+      dockerfile: Dockerfile
+    container_name: district-web
+    hostname: district-web
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - core-net
+
+networks:
+  core-net:
+    external: true

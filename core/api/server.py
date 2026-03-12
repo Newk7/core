@@ -71,6 +71,19 @@ class TaskStatusResponse(BaseModel):
     payload: Optional[dict] = None
 
 
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    company: Optional[str] = None
+    service: Optional[str] = None
+    message: str
+
+
+class ContactResponse(BaseModel):
+    status: str
+    message: str
+
+
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
@@ -85,6 +98,47 @@ def health():
         status="ok",
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+
+
+@app.post("/api/v1/contact", response_model=ContactResponse)
+def submit_contact(req: ContactRequest):
+    """Handle contact form submission.
+
+    Creates a task in the DB and queues it to SQS for async email delivery.
+    The worker picks it up and sends the email via SMTP - no blocking here.
+    """
+    er = get_er()
+
+    tk = Task(
+        type='contact',
+        msg=f'contact form from {req.name}',
+        email=req.email,
+        in_args={
+            'name': req.name,
+            'email': req.email,
+            'company': req.company or '',
+            'service': req.service or '',
+            'message': req.message,
+        },
+        db_enabled=er.db_task_enabled,
+        s3_enabled=False,
+    )
+
+    if er.db_pool_task:
+        tk.insert(er.db_pool_task)
+
+    try:
+        msg_id = publish_task(
+            task_data=tk.to_dict(),
+            sqs_client=er.get_sqs_client(),
+        )
+        log.info(f'contact queued tk.id={tk.id} from={req.name} <{req.email}> sqs={msg_id}')
+    except Exception as e:
+        log.error(f'failed to queue contact task: {e}')
+        # submission is still in DB even if SQS fails
+        log.info(f'CONTACT (db only): name={req.name} email={req.email} company={req.company} message={req.message}')
+
+    return ContactResponse(status='ok', message='Thank you for reaching out.')
 
 
 @app.post("/api/v1/tasks", response_model=TaskResponse)

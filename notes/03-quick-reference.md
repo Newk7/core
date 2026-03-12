@@ -11,6 +11,7 @@ cd stack/db && docker compose -f db.yaml down && docker compose -f db.yaml up -d
 cd stack/oweb && docker compose down && docker compose up -d
 cd stack/api && docker compose down && docker compose up -d --build
 cd stack/worker && docker compose down && docker compose up -d --build
+cd stack/district-web && docker compose down && docker compose up -d --build
 ./scripts/restart-nginx.sh
 
 # Generate htpasswd (after changing password in .env)
@@ -50,7 +51,7 @@ curl -s https://api.districtsolutions.ai/health -u kevin:PASS
 
 | Service | URL | Auth |
 |---------|-----|------|
-| Landing Page | https://districtsolutions.ai | None (public) |
+| Website | https://districtsolutions.ai | None (public) |
 | Open WebUI | https://kb.districtsolutions.ai | OWU login (no nginx auth) |
 | API | https://api.districtsolutions.ai | nginx basic auth |
 | API Health | https://api.districtsolutions.ai/health | None (exempt) |
@@ -76,6 +77,11 @@ curl -u kevin:PASS "https://api.districtsolutions.ai/api/v1/tasks?limit=10"
 curl -u kevin:PASS -X POST https://api.districtsolutions.ai/api/v1/upload \
   -F "file=@document.pdf" \
   -F "task_type=shred"
+
+# Submit contact form (no auth - public endpoint)
+curl -X POST https://api.districtsolutions.ai/api/v1/contact \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Doe", "email": "john@co.com", "message": "Hello"}'
 ```
 
 ## CloudFormation Stacks
@@ -85,6 +91,11 @@ curl -u kevin:PASS -X POST https://api.districtsolutions.ai/api/v1/upload \
 aws cloudformation deploy --template-file stack/cf/build-host/host.yaml --stack-name AI-BizTool --capabilities CAPABILITY_NAMED_IAM
 aws cloudformation deploy --template-file stack/cf/s3/s3.yaml --stack-name biz-tool-s3
 aws cloudformation deploy --template-file stack/cf/sqs/sqs.yaml --stack-name biz-tool-sqs
+aws cloudformation deploy --template-file stack/cf/ses/ses.yaml --stack-name biz-tool-ses --capabilities CAPABILITY_NAMED_IAM
+
+# After SES deploy: add DKIM + MAIL FROM DNS records, then request production access
+# Check SES domain verification status
+aws ses get-email-identity --email-identity districtsolutions.ai --query 'DkimAttributes.Status'
 
 # Check stack status
 aws cloudformation describe-stacks --query 'Stacks[*].{Name:StackName,Status:StackStatus}' --output table
@@ -111,6 +122,13 @@ ENV_NAME=dev python -m core.eng.worker
 
 # Run tests
 pytest
+
+# --- District Solutions Website (separate repo) ---
+cd /path/to/districtsolutions
+npm install
+npm run dev           # http://localhost:5173
+npm run build         # Production build to dist/
+npm test              # Playwright tests (6 viewports)
 ```
 
 ## Backup Strategy

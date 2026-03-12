@@ -5,3 +5,4 @@ stack/nginx/htpasswd
 __pycache__/
 *.pyc
 *.egg-info/
+.claude/

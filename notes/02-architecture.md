@@ -46,8 +46,8 @@
                 │    └──────────────┘
                 │
                 │    ┌──────────────┐
-                └───▶│  static SPA  │  (districtsolutions.ai)
-                     │  /var/www/   │
+                └───▶│ district-web │  (districtsolutions.ai)
+                     │    :80       │  React SPA in nginx container
                      └──────────────┘
 ```
 
@@ -55,9 +55,9 @@
 
 | URL | Nginx Auth | Backend | Purpose |
 |-----|-----------|---------|---------|
-| `https://districtsolutions.ai` | None (public) | Static SPA | Company landing page |
+| `https://districtsolutions.ai` | None (public) | district-web:80 | Company website (React SPA) |
 | `https://kb.districtsolutions.ai` | None (OWU JWT) | biz-tool-oweb:8080 | AI chat / knowledge base |
-| `https://api.districtsolutions.ai` | Basic auth | biz-tool-api:8000 | REST API for task pipeline |
+| `https://api.districtsolutions.ai` | Basic auth | biz-tool-api:8000 | REST API for tasks + contact form |
 
 ## SQS Task Architecture
 
@@ -150,6 +150,7 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
 | Project root | /home/ec2-user/core |
 | Python package | /home/ec2-user/core/core/ |
 | Docker compose files | /home/ec2-user/core/stack/{service}/ |
+| Website source | /home/ec2-user/frontend/district-web/ (or local dev repo) |
 | CloudFormation templates | /home/ec2-user/core/stack/cf/ |
 | Nginx configs | /home/ec2-user/core/stack/nginx/ |
 | Fail2ban configs | /home/ec2-user/core/stack/fail2ban/ |
@@ -163,6 +164,7 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
 | Port | Service | Exposure |
 |------|---------|----------|
 | 80 | nginx (HTTP → HTTPS redirect) | Public |
+| 80 | district-web (internal nginx) | Docker network (via nginx) |
 | 443 | nginx (HTTPS) | Public |
 | 8000 | BizTool API (FastAPI) | Docker network (via nginx) |
 | 8080 | Open WebUI | Docker network (via nginx) |

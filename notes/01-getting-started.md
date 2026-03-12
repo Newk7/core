@@ -18,8 +18,9 @@
 | Service | Container | Port | Purpose |
 |---------|-----------|------|---------|
 | nginx | core-nginx | 80, 443 | TLS termination, reverse proxy, basic auth |
+| Website | district-web | 80 (internal) | Company website SPA (districtsolutions.ai) |
 | Open WebUI | biz-tool-oweb | 9322 → 8080 | AI chat / knowledge base (kb.districtsolutions.ai) |
-| API | biz-tool-api | 8000 | FastAPI REST API for task pipeline |
+| API | biz-tool-api | 8000 | FastAPI REST API for task pipeline + contact form |
 | Worker | biz-tool-worker | — | SQS polling task processor |
 | Postgres | biz-tool-postgres | 5432 | Task tracking database |
 | fail2ban | (host-level) | — | Auto-ban brute force + bot scans |
@@ -53,11 +54,36 @@ aws cloudformation deploy \
   --region us-east-1
 ```
 
+**SES (email for contact form):**
+```bash
+aws cloudformation deploy \
+  --template-file stack/cf/ses/ses.yaml \
+  --stack-name biz-tool-ses \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-1
+```
+
+After SES deploy, add these DNS records at your provider (Namecheap):
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `<token1>._domainkey.districtsolutions.ai` | `<token1>.dkim.amazonses.com` |
+| CNAME | `<token2>._domainkey.districtsolutions.ai` | `<token2>.dkim.amazonses.com` |
+| CNAME | `<token3>._domainkey.districtsolutions.ai` | `<token3>.dkim.amazonses.com` |
+| MX | `mail.districtsolutions.ai` | `10 feedback-smtp.us-east-1.amazonses.com` |
+| TXT | `mail.districtsolutions.ai` | `v=spf1 include:amazonses.com ~all` |
+
+Get the DKIM token values from the SES console: Verified identities > districtsolutions.ai.
+
+Then request production access (out of sandbox): SES console > Account dashboard > Request production access.
+
 **Verify:**
 ```bash
 aws cloudformation describe-stacks --stack-name AI-BizTool --query 'Stacks[0].StackStatus'
 aws s3 ls | grep biz-tool
 aws sqs list-queues --queue-name-prefix biz-tool
+aws ses get-email-identity --email-identity districtsolutions.ai --query 'DkimAttributes.Status'
+# Expected: "SUCCESS" (after DNS propagation, may take 10-60 minutes)
 ```
 
 ---
@@ -94,6 +120,7 @@ POSTGRES_TASK_PW=<same as POSTGRES_PASSWORD>
 OWEB_SECRET_KEY=<random 32+ char string>
 ANTHROPIC_API_KEY=<your key>
 OPENAI_API_KEY=<your key, if using>
+# SES uses IAM role - no email credentials needed
 ```
 
 ---
@@ -184,14 +211,35 @@ cat stack/nginx/htpasswd
 
 ---
 
-### Step 7: Start All Services
+### Step 7: Clone the Website Frontend
+
+The District Solutions website is a separate React app built into a Docker container.
+The docker-compose at `stack/district-web/` references the source at `../../frontend/district-web`.
+
+```bash
+mkdir -p /home/ec2-user/frontend
+cd /home/ec2-user/frontend
+git clone <district-solutions-git-remote> district-web
+```
+
+Expected directory layout on EC2:
+```
+/home/ec2-user/
+  core/                    # This repo (infra, API, worker)
+  frontend/
+    district-web/          # District Solutions website (React SPA)
+```
+
+---
+
+### Step 8: Start All Services
 
 ```bash
 cd /home/ec2-user/core
 ./scripts/restart-all.sh
 ```
 
-This starts in order: postgres → open-webui → api → worker → nginx
+This starts in order: postgres → open-webui → api → worker → district-web → nginx
 
 **Verify everything is running:**
 ```bash
@@ -204,6 +252,7 @@ biz-tool-postgres   postgres:16-alpine         port 5432
 biz-tool-oweb       open-webui:latest          port 9322
 biz-tool-api        biz-tool-api               port 8000
 biz-tool-worker     biz-tool-worker            (no port)
+district-web        district-web               (internal :80)
 core-nginx          nginx:alpine               port 80, 443
 ```
 
@@ -239,7 +288,7 @@ curl -u kevin:YOUR_HTPASSWD_PASS https://api.districtsolutions.ai/health
 
 ---
 
-### Step 8: Install and Configure fail2ban
+### Step 9: Install and Configure fail2ban
 
 ```bash
 sudo ./scripts/setup-fail2ban.sh
@@ -285,7 +334,7 @@ sudo fail2ban-client set nginx-http-auth unbanip <your-ip>
 
 ---
 
-### Step 9: Verify External Access
+### Step 10: Verify External Access
 
 From your local machine (MacBook):
 
@@ -324,7 +373,7 @@ for i in {1..25}; do curl -so /dev/null -w "%{http_code}\n" https://districtsolu
 
 ---
 
-### Step 10: Configure Open WebUI
+### Step 11: Configure Open WebUI
 
 1. Open `https://kb.districtsolutions.ai` in your browser
 2. Create your admin account on first visit
@@ -335,7 +384,7 @@ for i in {1..25}; do curl -so /dev/null -w "%{http_code}\n" https://districtsolu
 
 ---
 
-### Step 11: Security Group Check
+### Step 12: Security Group Check
 
 Verify the EC2 security group only allows necessary ports:
 

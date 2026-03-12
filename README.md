@@ -7,8 +7,9 @@ Infrastructure, Python pipeline, and deployment for **District Solutions AI** (`
 | Service | Container | Port | Purpose |
 |---------|-----------|------|---------|
 | nginx | core-nginx | 80, 443 | TLS termination, reverse proxy, basic auth |
+| Website | district-web | 80 (internal) | Company website SPA (districtsolutions.ai) |
 | Open WebUI | biz-tool-oweb | 9322 → 8080 | AI chat / knowledge base (kb.districtsolutions.ai) |
-| API | biz-tool-api | 8000 | FastAPI REST API for task pipeline |
+| API | biz-tool-api | 8000 | FastAPI REST API for task pipeline + contact form |
 | Worker | biz-tool-worker | — | SQS polling task processor |
 | Postgres | biz-tool-postgres | 5432 | Task tracking database |
 | fail2ban | (host-level) | — | Auto-ban brute force + bot scans |
@@ -17,7 +18,7 @@ Infrastructure, Python pipeline, and deployment for **District Solutions AI** (`
 
 ```
 Internet → DNS → EC2 (34.234.159.163) → nginx (TLS + auth) → services
-                                                              ├─ districtsolutions.ai     → static SPA (public)
+                                                              ├─ districtsolutions.ai     → district-web container (public)
                                                               ├─ kb.districtsolutions.ai  → Open WebUI (OWU JWT auth)
                                                               └─ api.districtsolutions.ai → FastAPI (basic auth)
 ```
@@ -45,7 +46,7 @@ Internet → DNS → EC2 (34.234.159.163) → nginx (TLS + auth) → services
 ```
 core/                             # Python package
   log.py                          # Logger (stdout with color)
-  api/server.py                   # FastAPI endpoints
+  api/server.py                   # FastAPI endpoints (tasks, upload, contact form)
   eng/resources.py                # Shared DB, SQS, S3 clients
   eng/handle_task.py              # Task dispatcher
   eng/worker.py                   # SQS polling worker loop
@@ -61,7 +62,7 @@ stack/                            # Docker + infrastructure
     nginx.conf                    # Main config (TLS, rate limiting, security headers)
     conf.d/                       # Virtual hosts (districtsolutions.ai, kb, api)
     nginx.yaml                    # Docker compose
-    html/index.html               # Landing page SPA
+  district-web/                   # Company website container (compose only, builds from frontend repo)
   api/                            # API container (Dockerfile + compose)
   worker/                         # Worker container (Dockerfile + compose)
   db/                             # Postgres (compose + schema)
@@ -71,6 +72,7 @@ stack/                            # Docker + infrastructure
     build-host/host.yaml          # EC2 instance
     s3/s3.yaml                    # Task data bucket
     sqs/sqs.yaml                  # Task + result queues
+    ses/ses.yaml                  # SES email identity + DKIM + IAM policy
 
 scripts/                          # Deployment scripts
   restart-all.sh                  # Start all services in order
