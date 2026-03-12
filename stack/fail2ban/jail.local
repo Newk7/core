@@ -1,0 +1,42 @@
+# fail2ban jail configuration for core / districtsolutions.ai
+# install on the EC2 host: sudo dnf install -y fail2ban
+# copy this file to /etc/fail2ban/jail.local
+# copy filter.d/*.conf to /etc/fail2ban/filter.d/
+
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 5
+backend  = auto
+banaction = iptables-multiport
+
+# --- nginx auth failures ---
+[nginx-http-auth]
+enabled  = true
+filter   = nginx-auth
+logpath  = /home/ec2-user/core/data/nginx/logs/*_error.log
+bantime  = 3600
+maxretry = 5
+findtime = 600
+
+# --- bot scanners (.env, wp-admin, .git, etc.) ---
+[nginx-botsearch]
+enabled  = true
+filter   = nginx-botsearch
+logpath  = /home/ec2-user/core/data/nginx/logs/*_access.log
+bantime  = 3600
+maxretry = 2
+
+# --- rate limit violations (503 from nginx limit_req) ---
+[nginx-limit-req]
+enabled  = true
+filter   = nginx-limit-req
+logpath  = /home/ec2-user/core/data/nginx/logs/*_error.log
+bantime  = 600
+maxretry = 10
+findtime = 120
+
+# --- ssh brute force ---
+[sshd]
+enabled  = true
+maxretry = 3

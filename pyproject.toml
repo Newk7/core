@@ -32,7 +32,5 @@ dev = [
 [build-system]
 requires = ["setuptools", "wheel"]
 
-[tool.setuptools]
-packages = [
-    "core",
-]
+[tool.setuptools.packages.find]
+include = ["core*"]

@@ -19,6 +19,12 @@ services:
       - TASK_BUCKET=${TASK_BUCKET}
       - DB_ENABLED=${DB_ENABLED:-1}
       - S3_ENABLED=${S3_ENABLED:-1}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://districtsolutions.ai,https://kb.districtsolutions.ai}
+    networks:
+      - core-net
     extra_hosts:
       - host.docker.internal:host-gateway
+
+networks:
+  core-net:
+    external: true

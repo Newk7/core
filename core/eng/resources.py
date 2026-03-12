@@ -33,11 +33,10 @@ class EngResources:
         log.info(f'init er env: {self.env_name}')
 
         if self.db_pool_task is None and self.db_task_enabled:
-            try:
-                self.db_pool_task = get_db_pool(env_name=self.env_name)
-            except Exception as e:
-                log.error(f'failed to get db task pool: {e}')
-                raise e
+            self.db_pool_task = get_db_pool(env_name=self.env_name)
+            if self.db_pool_task is None:
+                log.warning('db pool returned None, disabling db')
+                self.db_task_enabled = False
 
         if self.sqs_client is None:
             try:

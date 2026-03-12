@@ -1,19 +1,38 @@
 # core
 
-Infrastructure and tooling for the BizTool AI platform.
+Infrastructure, Python pipeline, and deployment for **District Solutions AI** (`districtsolutions.ai`).
+
+## Services
+
+| Service | Container | Port | Purpose |
+|---------|-----------|------|---------|
+| nginx | core-nginx | 80, 443 | TLS termination, reverse proxy, basic auth |
+| Open WebUI | biz-tool-oweb | 9322 → 8080 | AI chat / knowledge base (kb.districtsolutions.ai) |
+| API | biz-tool-api | 8000 | FastAPI REST API for task pipeline |
+| Worker | biz-tool-worker | — | SQS polling task processor |
+| Postgres | biz-tool-postgres | 5432 | Task tracking database |
+| fail2ban | (host-level) | — | Auto-ban brute force + bot scans |
 
 ## Architecture
 
-- **Compute**: EC2 host on AWS (Amazon Linux 2023, t3.medium) with Docker and Nginx
-- **Data Layer**: S3 (task manifest.json files by UUID) + Postgres (task tracking DB)
+```
+Internet → DNS → EC2 (34.234.159.163) → nginx (TLS + auth) → services
+                                                              ├─ districtsolutions.ai     → static SPA (public)
+                                                              ├─ kb.districtsolutions.ai  → Open WebUI (OWU JWT auth)
+                                                              └─ api.districtsolutions.ai → FastAPI (basic auth)
+```
+
+- **Compute**: EC2 t3.medium (Amazon Linux 2023) with Docker
+- **Data Layer**: S3 (task manifests + parquet) + Postgres (task tracking)
 - **Message Queue**: AWS SQS (task queue + result queue with DLQs)
-- **API**: FastAPI/Uvicorn REST API for frontend apps
-- **Workers**: SQS-polling task workers for document processing and shredding
-- **UI**: Open WebUI container running behind Nginx reverse proxy
+- **API**: FastAPI/Uvicorn REST API
+- **Workers**: SQS-polling task workers for document processing
+- **UI**: Open WebUI behind nginx reverse proxy
+- **Security**: nginx TLS + rate limiting + basic auth + fail2ban
 
 ### Task Flow
 
-1. Frontend submits task via REST API (`POST /api/v1/tasks` or `/api/v1/upload`)
+1. Client submits task via REST API (`POST /api/v1/tasks` or `/api/v1/upload`)
 2. API creates task in Postgres, publishes to SQS task queue
 3. Worker polls SQS, deserializes task, runs handler (shred, chat, etc.)
 4. Worker converts documents to markdown via Docling, writes parquet to S3
@@ -21,60 +40,89 @@ Infrastructure and tooling for the BizTool AI platform.
 6. Completion notification sent to SQS result queue
 7. Task status updated in Postgres
 
-## AWS Account
-
-- **Account**: 381492049589
-- **Region**: us-east-1
-- **VPC**: vpc-0dd28884da7e4d4eb (10.0.0.0/16)
-- **Subnet**: subnet-0531a7a14eef69db2 (10.0.0.0/24, us-east-1b, public)
-- **IGW**: igw-0ff11a9a0a107c8ed
-
-## Python Core (`core/`)
-
-The `core` Python package contains all custom business logic and pipeline code.
+## Project Structure
 
 ```
-core/
-  log.py                        # Logger (stdout with color support)
-  s3/                           # S3 operations
-    get_client.py               # boto3 S3 client factory
-    upload_file.py              # Upload with encryption
-    download_file.py            # Download to memory
-    download_s3_keys.py         # Batch download by S3 URIs
-  sqs/                          # SQS message queue (replaces Redis for queuing)
-    get_client.py               # boto3 SQS client + queue URL resolver
-    publish.py                  # Publish tasks and results to queues
-    consume.py                  # Long-poll receive + delete messages
-  db/                           # Postgres
-    get_db_pool.py              # Connection pool (dev/prod env switching)
-  jobs/                         # Task model
-    task.py                     # Task class with DB insert/update, S3 manifest, SQS pub
-  eng/                          # Engine
-    resources.py                # EngResources (shared DB pool, SQS, S3 clients)
-    handle_task.py              # Task dispatcher (shred, chat, etc.)
-    worker.py                   # SQS polling worker loop with graceful shutdown
-  docling/                      # Document conversion
-    convert_file_to_markdown.py # Multi-format to markdown (PDF, DOCX, HTML, PPTX, CSV)
-                                # OCR support: Tesseract, EasyOCR, RapidOCR, Mac OCR
-                                # Bounding box artifact extraction
-  shred/                        # Document shredding pipeline
-    run_shred.py                # Download from S3, convert to markdown, write parquet
-  api/                          # FastAPI REST API
-    server.py                   # Endpoints: health, tasks CRUD, file upload
+core/                             # Python package
+  log.py                          # Logger (stdout with color)
+  api/server.py                   # FastAPI endpoints
+  eng/resources.py                # Shared DB, SQS, S3 clients
+  eng/handle_task.py              # Task dispatcher
+  eng/worker.py                   # SQS polling worker loop
+  jobs/task.py                    # Task lifecycle model
+  s3/                             # S3 upload/download
+  sqs/                            # SQS publish/consume
+  db/get_db_pool.py               # Postgres connection pool
+  docling/                        # Document → markdown conversion
+  shred/run_shred.py              # Document shredding pipeline
+
+stack/                            # Docker + infrastructure
+  nginx/                          # Nginx reverse proxy + SSL
+    nginx.conf                    # Main config (TLS, rate limiting, security headers)
+    conf.d/                       # Virtual hosts (districtsolutions.ai, kb, api)
+    nginx.yaml                    # Docker compose
+    html/index.html               # Landing page SPA
+  api/                            # API container (Dockerfile + compose)
+  worker/                         # Worker container (Dockerfile + compose)
+  db/                             # Postgres (compose + schema)
+  oweb/                           # Open WebUI (compose)
+  fail2ban/                       # fail2ban jails and filters
+  cf/                             # CloudFormation templates
+    build-host/host.yaml          # EC2 instance
+    s3/s3.yaml                    # Task data bucket
+    sqs/sqs.yaml                  # Task + result queues
+
+scripts/                          # Deployment scripts
+  restart-all.sh                  # Start all services in order
+  restart-nginx.sh                # Quick nginx restart
+  generate-htpasswd.sh            # Create basic auth credentials
+  setup-fail2ban.sh               # Install + configure fail2ban
+
+notes/                            # Documentation
+  01-getting-started.md           # Full setup guide
+  02-architecture.md              # Network topology + security layers
+  03-quick-reference.md           # Commands, URLs, API usage
+  openapi-tool-servers.md         # OpenAPI tool servers for OpenWebUI
 ```
 
-### Key Patterns
+## Quick Start
+
+```bash
+# 1. Configure
+cp .env.example .env              # Fill in secrets
+
+# 2. Place SSL cert
+mkdir -p data/ssl
+# Copy districtsolutions.ai.crt and .key into data/ssl/
+
+# 3. Create docker network + htpasswd
+docker network create core-net
+./scripts/generate-htpasswd.sh
+
+# 4. Start everything
+./scripts/restart-all.sh
+```
+
+See [notes/01-getting-started.md](notes/01-getting-started.md) for the full step-by-step guide.
+
+## Documentation
+
+| Doc | Content |
+|-----|---------|
+| [01-getting-started.md](notes/01-getting-started.md) | Full setup: AWS, DNS, SSL, Docker, fail2ban |
+| [02-architecture.md](notes/02-architecture.md) | Network topology, security layers, port map |
+| [03-quick-reference.md](notes/03-quick-reference.md) | Commands, URLs, API usage, backups |
+| [openapi-tool-servers.md](notes/openapi-tool-servers.md) | OpenAPI tool servers for OpenWebUI |
+
+## Python Package (`core/`)
 
 ```python
-# Import pattern
 from core.log import create_log
 from core.jobs.task import Task
 from core.eng.resources import EngResources
 from core.sqs.publish import publish_task
-from core.s3.download_s3_keys import download_s3_keys
-from core.docling.convert_file_to_markdown import convert_to_markdown
 
-# Create a task
+# Create and queue a task
 tk = Task(type='shred', msg='process document', user_id='user1')
 tk.insert(db_pool)
 publish_task(task_data=tk.to_dict())
@@ -82,90 +130,22 @@ publish_task(task_data=tk.to_dict())
 # Status codes: -999=init, 0=success, 150-500=processing, <0=error
 ```
 
-## Stack Layout
+## AWS Account
 
-```
-stack/
-  cf/                           # CloudFormation templates
-    build-host/
-      host.yaml                 # EC2 build host (deployed as AI-BizTool stack)
-      example-host.yaml         # Reference Ubuntu host template
-    s3/
-      s3.yaml                   # Task data S3 bucket
-    sqs/
-      sqs.yaml                  # Task + result SQS queues with DLQs
-    windows-vm/
-      ec2.yaml                  # (placeholder)
-  api/                          # Core API container
-    Dockerfile                  # Python 3.11 + tesseract + poppler
-    docker-compose.yaml         # FastAPI on port 8000
-  worker/                       # Task worker container
-    Dockerfile                  # Same base as API
-    docker-compose.yaml         # SQS polling worker
-  db/
-    db.yaml                     # Docker-compose for Postgres on the host
-    init/
-      001-schema.sql            # Task tracking schema (tasks + task_results)
-  oweb/
-    docker-compose.yaml         # Open WebUI container
-    nginx.conf                  # Nginx reverse proxy config
-  redis/                        # (placeholder)
-  vim-files/                    # Dev environment setup scripts (vim, nvm, fzf)
-```
+- **Account**: 381492049589
+- **Region**: us-east-1
+- **VPC**: vpc-0dd28884da7e4d4eb (10.0.0.0/16)
+- **Subnet**: subnet-0531a7a14eef69db2 (10.0.0.0/24, us-east-1b, public)
 
-## Deploying
+## Key Decisions
 
-### CloudFormation Stacks
-
-```bash
-# EC2 host (already deployed)
-aws cloudformation deploy \
-  --template-file stack/cf/build-host/host.yaml \
-  --stack-name AI-BizTool \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
-
-# S3 bucket
-aws cloudformation deploy \
-  --template-file stack/cf/s3/s3.yaml \
-  --stack-name biz-tool-s3 \
-  --region us-east-1
-
-# SQS queues
-aws cloudformation deploy \
-  --template-file stack/cf/sqs/sqs.yaml \
-  --stack-name biz-tool-sqs \
-  --region us-east-1
-```
-
-### On the EC2 Host
-
-```bash
-# Start Postgres
-cd stack/db && docker compose up -d
-
-# Start Open WebUI
-cd stack/oweb && docker compose up -d
-
-# Build and start the API
-cd stack/api && docker compose up -d --build
-
-# Build and start the worker
-cd stack/worker && docker compose up -d --build
-
-# Copy nginx config
-sudo cp stack/oweb/nginx.conf /etc/nginx/conf.d/oweb.conf
-sudo systemctl reload nginx
-```
-
-### Local Development
-
-```bash
-pip install -e ".[dev]"
-
-# Run the API locally
-uvicorn core.api.server:app --reload --port 8000
-
-# Run the worker locally
-python -m core.eng.worker
-```
+- **Purchased SSL cert** — not Let's Encrypt. Cert files in `data/ssl/`, referenced by nginx. Renewal is manual when cert expires.
+- **nginx basic auth on API** — protects API endpoints until go-live. `/health` is exempt. Remove `auth_basic` lines when ready.
+- **No nginx auth on kb subdomain** — OWU uses JWT in the Authorization header. Adding basic auth would intercept those tokens and break OWU.
+- **gzip disabled on kb subdomain** — breaks Server-Sent Events for streaming chat responses.
+- **fail2ban on host** — not in container. Uses `backend = auto` to read log files directly.
+- **core-net Docker network** — all containers join this external network for DNS-based service discovery.
+- **SQS instead of Redis** — task queue and result notifications via AWS SQS with DLQs for reliability.
+- **S3 for artifacts** — task manifests, parquet output, and bbox artifacts stored in versioned S3 bucket.
+- **Postgres 16 pinned** — avoids data directory compatibility issues with newer versions.
+- **Default nginx server** — drops connections with unknown Host headers (returns 444) to reject port scanners.

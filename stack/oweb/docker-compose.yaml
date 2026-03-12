@@ -1,6 +1,4 @@
-# Open WebUI - running on the EC2 build host behind nginx
-# Based on aic/stack/oweb pattern
-# TODO: update domain and env vars once domain is acquired
+# Open WebUI - kb.districtsolutions.ai - behind nginx on core-net
 
 services:
   oweb:
@@ -12,10 +10,11 @@ services:
       - "9322:8080"
     environment:
       - WEBUI_NAME=BizTool AI
+      - WEBUI_URL=https://kb.districtsolutions.ai
       - ENABLE_OLLAMA_API=False
       - ENABLE_OAUTH_SIGNUP=True
       - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=True
-      - CORS_ALLOW_ORIGIN=${OWEB_CORS_ALLOW_ORIGIN:-*}
+      - CORS_ALLOW_ORIGIN=${OWEB_CORS_ALLOW_ORIGIN:-https://kb.districtsolutions.ai}
       - PORT=8080
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -25,9 +24,15 @@ services:
       - DATABASE_URL=${OWEB_DATABASE_URL:-sqlite:///app/backend/data/webui.db}
     volumes:
       - oweb-data:/app/backend/data
+    networks:
+      - core-net
     extra_hosts:
       - host.docker.internal:host-gateway
 
 volumes:
   oweb-data:
     driver: local
+
+networks:
+  core-net:
+    external: true

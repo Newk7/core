@@ -16,6 +16,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
+    networks:
+      - core-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-biztool} -d ${POSTGRES_DB:-biztool}"]
       interval: 10s
@@ -25,3 +27,7 @@ services:
 volumes:
   pgdata:
     driver: local
+
+networks:
+  core-net:
+    external: true

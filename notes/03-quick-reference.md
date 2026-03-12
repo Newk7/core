@@ -1,0 +1,147 @@
+# Quick Reference
+
+## Common Commands
+
+```bash
+# Start everything
+./scripts/restart-all.sh
+
+# Restart individual services
+cd stack/db && docker compose -f db.yaml down && docker compose -f db.yaml up -d
+cd stack/oweb && docker compose down && docker compose up -d
+cd stack/api && docker compose down && docker compose up -d --build
+cd stack/worker && docker compose down && docker compose up -d --build
+./scripts/restart-nginx.sh
+
+# Generate htpasswd (after changing password in .env)
+./scripts/generate-htpasswd.sh
+
+# Check all containers
+docker ps
+
+# View nginx logs
+tail -f data/nginx/logs/kb.districtsolutions.ai_access.log
+tail -f data/nginx/logs/api.districtsolutions.ai_error.log
+
+# Check fail2ban status
+sudo fail2ban-client status
+sudo fail2ban-client status nginx-http-auth
+
+# Unban an IP
+sudo fail2ban-client set nginx-http-auth unbanip <IP>
+
+# Postgres CLI
+docker exec -it biz-tool-postgres psql -U biztool -d biztool
+# Then: SELECT * FROM tasks ORDER BY created_at DESC LIMIT 10;
+
+# Check SQS queue depth
+aws sqs get-queue-attributes \
+  --queue-url $(aws sqs get-queue-url --queue-name biz-tool-prod-task-queue --query QueueUrl --output text) \
+  --attribute-names ApproximateNumberOfMessages
+
+# Check S3 bucket
+aws s3 ls s3://biz-tool-prod-task-data/tasks/ --recursive | tail -20
+
+# API health check
+curl -s https://api.districtsolutions.ai/health -u kevin:PASS
+```
+
+## URLs
+
+| Service | URL | Auth |
+|---------|-----|------|
+| Landing Page | https://districtsolutions.ai | None (public) |
+| Open WebUI | https://kb.districtsolutions.ai | OWU login (no nginx auth) |
+| API | https://api.districtsolutions.ai | nginx basic auth |
+| API Health | https://api.districtsolutions.ai/health | None (exempt) |
+
+## API Endpoints
+
+```bash
+# Health check (no auth)
+curl https://api.districtsolutions.ai/health
+
+# Create a task (auth required)
+curl -u kevin:PASS -X POST https://api.districtsolutions.ai/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"type": "shred", "msg": "process document"}'
+
+# Get task status
+curl -u kevin:PASS https://api.districtsolutions.ai/api/v1/tasks/{task-id}
+
+# List tasks
+curl -u kevin:PASS "https://api.districtsolutions.ai/api/v1/tasks?limit=10"
+
+# Upload file and create task
+curl -u kevin:PASS -X POST https://api.districtsolutions.ai/api/v1/upload \
+  -F "file=@document.pdf" \
+  -F "task_type=shred"
+```
+
+## CloudFormation Stacks
+
+```bash
+# Deploy / update stacks
+aws cloudformation deploy --template-file stack/cf/build-host/host.yaml --stack-name AI-BizTool --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation deploy --template-file stack/cf/s3/s3.yaml --stack-name biz-tool-s3
+aws cloudformation deploy --template-file stack/cf/sqs/sqs.yaml --stack-name biz-tool-sqs
+
+# Check stack status
+aws cloudformation describe-stacks --query 'Stacks[*].{Name:StackName,Status:StackStatus}' --output table
+```
+
+## SSH Access from MacBook
+
+```bash
+ssh ec2-user@34.234.159.163
+cd /home/ec2-user/core
+```
+
+## Local Development
+
+```bash
+# Install package in dev mode
+pip install -e ".[dev]"
+
+# Run the API locally
+ENV_NAME=dev uvicorn core.api.server:app --reload --port 8000
+
+# Run the worker locally
+ENV_NAME=dev python -m core.eng.worker
+
+# Run tests
+pytest
+```
+
+## Backup Strategy
+
+Critical data to back up:
+```
+data/ssl/              # SSL certificates (purchased)
+data/nginx/logs/       # Nginx logs (for fail2ban and audit)
+.env                   # Secrets (store separately/securely)
+```
+
+AWS-managed data (backed up by AWS):
+```
+S3 bucket              # Versioned, lifecycle rules
+SQS queues             # Ephemeral (messages processed and deleted)
+Postgres               # Docker volume on EC2 (consider RDS for production)
+Open WebUI             # Docker volume (oweb-data)
+```
+
+## SSL Certificate Renewal
+
+Your purchased cert has a fixed expiry. To renew:
+
+```bash
+# Check current expiry
+openssl x509 -in data/ssl/districtsolutions.ai.crt -noout -enddate
+
+# After purchasing renewal, replace cert files
+scp new-cert.crt ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/districtsolutions.ai.crt
+scp new-cert.key ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/districtsolutions.ai.key
+
+# Reload nginx
+./scripts/restart-nginx.sh
+```
