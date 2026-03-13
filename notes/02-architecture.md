@@ -123,7 +123,7 @@ tasks/{task-uuid}/
 ```
 Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Service
                           │                    │
-                     ports 22,80,443           ├─ TLS 1.2/1.3 (purchased cert)
+                     ports 22,80,443           ├─ TLS 1.2/1.3 (Let's Encrypt cert, auto-renewed)
                      CIDR whitelist            ├─ basic auth (API endpoints)
                      for SSH                   ├─ rate limiting (10r/s general, 5r/s auth)
                                                ├─ security headers
@@ -135,7 +135,7 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
 
 1. **EC2 Security Group** - Ports 22, 80, 443 all CIDR-locked to team IPs pre-launch. At go-live, open 80/443 to 0.0.0.0/0 (keep SSH CIDR-locked). See Step 13 in 01-getting-started.md
 2. **nginx default server** - Drops connections with no matching Host header (returns 444)
-3. **nginx TLS** - TLSv1.2/1.3 with strong ECDHE ciphers, purchased cert
+3. **nginx TLS** - TLSv1.2/1.3 with strong ECDHE ciphers, Let's Encrypt cert (auto-renewed via cron)
 4. **nginx rate limiting** - 10 req/s general, 5 req/s on auth endpoints
 5. **nginx security headers** - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
 6. **nginx basic auth** - htpasswd on API endpoints. NOT on kb subdomain (OWU handles JWT auth)
@@ -147,17 +147,17 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
 
 | What | Path |
 |------|------|
-| Project root | /home/ec2-user/core |
-| Python package | /home/ec2-user/core/core/ |
-| Docker compose files | /home/ec2-user/core/stack/{service}/ |
-| Website source | /home/ec2-user/frontend/district-web/ (or local dev repo) |
-| CloudFormation templates | /home/ec2-user/core/stack/cf/ |
-| Nginx configs | /home/ec2-user/core/stack/nginx/ |
-| Fail2ban configs | /home/ec2-user/core/stack/fail2ban/ |
-| Scripts | /home/ec2-user/core/scripts/ |
-| SSL certificates | /home/ec2-user/core/data/ssl/ |
-| Nginx logs | /home/ec2-user/core/data/nginx/logs/ |
-| Environment secrets | /home/ec2-user/core/.env |
+| Project root | /opt/ds/core |
+| Python package | /opt/ds/core/core/ |
+| Docker compose files | /opt/ds/core/stack/{service}/ |
+| Website source | /opt/ds/districtsolutions/ |
+| CloudFormation templates | /opt/ds/core/stack/cf/ |
+| Nginx configs | /opt/ds/core/stack/nginx/ |
+| Fail2ban configs | /opt/ds/core/stack/fail2ban/ |
+| Scripts | /opt/ds/core/scripts/ |
+| SSL certificates | /opt/ds/core/data/letsencrypt/live/districtsolutions.ai/ |
+| Nginx logs | /opt/ds/core/data/nginx/logs/ |
+| Environment secrets | /opt/ds/core/.env |
 
 ## Port Map
 

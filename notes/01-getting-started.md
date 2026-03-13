@@ -9,7 +9,7 @@
 | VPC | vpc-0dd28884da7e4d4eb (10.0.0.0/16) |
 | Subnet | subnet-0531a7a14eef69db2 (10.0.0.0/24, us-east-1b, public) |
 | Public IP | 34.234.159.163 |
-| Domain | districtsolutions.ai (DNS provider, purchased cert) |
+| Domain | districtsolutions.ai (Namecheap DNS, Let's Encrypt cert) |
 | Python | 3.11 (container) |
 | Account | 381492049589 |
 
@@ -88,13 +88,36 @@ aws ses get-email-identity --email-identity districtsolutions.ai --query 'DkimAt
 
 ---
 
-### Step 2: SSH into EC2 and Clone the Repo
+### Step 2: SSH into EC2 and Install Docker Plugins
+
+The CloudFormation UserData installs Docker but not the Compose or Buildx plugins:
 
 ```bash
-ssh ec2-user@34.234.159.163
+ssh kevin@34.234.159.163
 
-# Clone the repo
-cd /home/ec2-user
+# Install Docker Compose v2
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -fSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Install Docker Buildx (v0.17.0+ required)
+sudo curl -fSL https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+# Disable the host-level nginx (conflicts with Docker nginx on ports 80/443)
+sudo systemctl stop nginx && sudo systemctl disable nginx
+
+# Verify
+docker compose version
+docker buildx version
+```
+
+### Step 2b: Clone the Repos
+
+```bash
+cd /opt/ds
 git clone <your-git-remote> core
 cd core
 ```
@@ -171,7 +194,7 @@ ADMIN_EMAIL=hello@districtsolutions.ai
 
 **Step 5c: Start nginx first** (it serves the ACME challenge directory):
 ```bash
-cd /home/ec2-user/core
+cd /opt/ds/core
 
 # Create required directories
 mkdir -p data/letsencrypt data/certbot-webroot data/nginx/logs
@@ -214,29 +237,47 @@ crontab -e
 Add this line:
 ```cron
 # Renew Let's Encrypt certs twice a month (certbot only renews if within 30 days of expiry)
-0 3 1,15 * * /home/ec2-user/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
+0 3 1,15 * * /opt/ds/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
 ```
 
 **First-time bootstrap (chicken-and-egg problem):**
 
-nginx needs certs to start HTTPS, but certbot needs nginx running on port 80 to serve the challenge. For the very first cert issuance:
+nginx needs certs to start HTTPS, but certbot needs nginx running on port 80 to serve the challenge. Additionally, nginx fails to start if upstream containers (district-web, biz-tool-api, biz-tool-oweb) aren't running. For the very first cert issuance:
 
 ```bash
-# Option A: Generate a temporary self-signed cert so nginx can start
+# 1. Move configs for services that aren't running yet
+mkdir -p stack/nginx/conf.d/disabled
+mv stack/nginx/conf.d/api.districtsolutions.ai.conf stack/nginx/conf.d/disabled/
+mv stack/nginx/conf.d/kb.districtsolutions.ai.conf stack/nginx/conf.d/disabled/
+mv stack/nginx/conf.d/districtsolutions.ai.conf stack/nginx/conf.d/disabled/
+
+# 2. Generate a temporary self-signed cert so nginx can start
 mkdir -p data/letsencrypt/live/districtsolutions.ai
 openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
   -keyout data/letsencrypt/live/districtsolutions.ai/privkey.pem \
   -out data/letsencrypt/live/districtsolutions.ai/fullchain.pem \
   -subj "/CN=districtsolutions.ai"
 
-# Start nginx (HTTPS will show cert warning, but port 80 works for ACME)
+# 3. Start nginx (only base config with port 80 ACME challenge)
 cd stack/nginx && docker compose -f nginx.yaml up -d && cd ../..
 
-# Now issue the real cert
+# 4. Verify port 80 is responding
+curl -I -H "Host: districtsolutions.ai" http://localhost/.well-known/acme-challenge/test
+# Should return 404 from nginx (that's fine)
+
+# 5. Issue the real cert
 ./scripts/issue-cert.sh
 
-# Restart nginx to pick up the real cert
-./scripts/restart-nginx.sh
+# 6. Clean up old self-signed cert remnants if re-issuing
+# rm -rf data/letsencrypt/live/districtsolutions.ai
+# rm -rf data/letsencrypt/archive/districtsolutions.ai
+# rm -f data/letsencrypt/renewal/districtsolutions.ai.conf
+
+# 7. Move configs back and restart nginx
+mv stack/nginx/conf.d/disabled/*.conf stack/nginx/conf.d/
+rmdir stack/nginx/conf.d/disabled
+cd stack/nginx && docker compose -f nginx.yaml down && docker compose -f nginx.yaml up -d && cd ../..
+# Note: nginx will fail if upstream services aren't running yet — start them first (Step 8)
 ```
 
 > **Cert files:** nginx is configured to read from `data/letsencrypt/live/districtsolutions.ai/`:
@@ -257,7 +298,7 @@ If you later move DNS to Cloudflare, you can use DNS-01 challenge for wildcard c
 ### Step 6: Create Docker Network and Generate htpasswd
 
 ```bash
-cd /home/ec2-user/core
+cd /opt/ds/core
 
 # Create the shared docker network
 docker network create core-net
@@ -281,20 +322,18 @@ cat stack/nginx/htpasswd
 ### Step 7: Clone the Website Frontend
 
 The District Solutions website is a separate React app built into a Docker container.
-The docker-compose at `stack/district-web/` references the source at `../../frontend/district-web`.
+The docker-compose at `stack/district-web/` builds from `/opt/ds/districtsolutions`.
 
 ```bash
-mkdir -p /home/ec2-user/frontend
-cd /home/ec2-user/frontend
-git clone <district-solutions-git-remote> district-web
+cd /opt/ds
+git clone <district-solutions-git-remote> districtsolutions
 ```
 
 Expected directory layout on EC2:
 ```
-/home/ec2-user/
+/opt/ds/
   core/                    # This repo (infra, API, worker)
-  frontend/
-    district-web/          # District Solutions website (React SPA)
+  districtsolutions/       # District Solutions website (React SPA)
 ```
 
 ---
@@ -302,7 +341,7 @@ Expected directory layout on EC2:
 ### Step 8: Start All Services
 
 ```bash
-cd /home/ec2-user/core
+cd /opt/ds/core
 ./scripts/restart-all.sh
 ```
 
@@ -525,16 +564,19 @@ docker logs core-nginx
 ### SSL cert issues
 ```bash
 # Verify cert files exist and are readable
-ls -la data/ssl/
-openssl x509 -in data/ssl/districtsolutions.ai.crt -text -noout | head -20
+ls -la data/letsencrypt/live/districtsolutions.ai/
 
-# Verify key matches cert
-openssl x509 -noout -modulus -in data/ssl/districtsolutions.ai.crt | md5sum
-openssl rsa -noout -modulus -in data/ssl/districtsolutions.ai.key | md5sum
-# Must match
+# Check cert details and SANs
+openssl x509 -in data/letsencrypt/live/districtsolutions.ai/cert.pem -text -noout | grep -E "Subject:|DNS:"
 
 # Check cert expiry
-openssl x509 -in data/ssl/districtsolutions.ai.crt -noout -enddate
+openssl x509 -in data/letsencrypt/live/districtsolutions.ai/cert.pem -noout -enddate
+
+# Force re-issue if needed
+rm -rf data/letsencrypt/live/districtsolutions.ai
+rm -rf data/letsencrypt/archive/districtsolutions.ai
+rm -f data/letsencrypt/renewal/districtsolutions.ai.conf
+./scripts/issue-cert.sh
 ```
 
 ### Can't reach Open WebUI through nginx
@@ -583,6 +625,6 @@ The nginx config for kb.districtsolutions.ai does NOT have basic auth enabled. T
 
 ### SSH from MacBook
 ```bash
-ssh ec2-user@34.234.159.163
-cd /home/ec2-user/core
+ssh kevin@34.234.159.163
+cd /opt/ds/core
 ```

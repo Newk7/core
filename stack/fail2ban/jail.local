@@ -14,7 +14,7 @@ banaction = iptables-multiport
 [nginx-http-auth]
 enabled  = true
 filter   = nginx-auth
-logpath  = /home/ec2-user/core/data/nginx/logs/*_error.log
+logpath  = /opt/ds/core/data/nginx/logs/*_error.log
 bantime  = 3600
 maxretry = 5
 findtime = 600
@@ -23,7 +23,7 @@ findtime = 600
 [nginx-botsearch]
 enabled  = true
 filter   = nginx-botsearch
-logpath  = /home/ec2-user/core/data/nginx/logs/*_access.log
+logpath  = /opt/ds/core/data/nginx/logs/*_access.log
 bantime  = 3600
 maxretry = 2
 
@@ -31,7 +31,7 @@ maxretry = 2
 [nginx-limit-req]
 enabled  = true
 filter   = nginx-limit-req
-logpath  = /home/ec2-user/core/data/nginx/logs/*_error.log
+logpath  = /opt/ds/core/data/nginx/logs/*_error.log
 bantime  = 600
 maxretry = 10
 findtime = 120

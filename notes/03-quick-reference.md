@@ -104,8 +104,8 @@ aws cloudformation describe-stacks --query 'Stacks[*].{Name:StackName,Status:Sta
 ## SSH Access from MacBook
 
 ```bash
-ssh ec2-user@34.234.159.163
-cd /home/ec2-user/core
+ssh kevin@34.234.159.163
+cd /opt/ds/core
 ```
 
 ## Local Development
@@ -135,7 +135,7 @@ npm test              # Playwright tests (6 viewports)
 
 Critical data to back up:
 ```
-data/ssl/              # SSL certificates (purchased)
+data/letsencrypt/      # SSL certificates (Let's Encrypt, auto-renewed)
 data/nginx/logs/       # Nginx logs (for fail2ban and audit)
 .env                   # Secrets (store separately/securely)
 ```
@@ -172,5 +172,5 @@ ls data/letsencrypt/live/districtsolutions.ai/
 
 Auto-renewal cron (should already be set up — see Step 5f):
 ```cron
-0 3 1,15 * * /home/ec2-user/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
+0 3 1,15 * * /opt/ds/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
 ```
