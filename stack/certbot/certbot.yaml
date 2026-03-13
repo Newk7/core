@@ -1,0 +1,43 @@
+# Certbot for Let's Encrypt SSL certs via HTTP-01 challenge
+# Uses nginx webroot mode — nginx serves /.well-known/acme-challenge/
+# No Cloudflare or DNS API needed, just port 80 open to the internet
+#
+# Issue:   ./scripts/issue-cert.sh
+# Renew:   ./scripts/renew-cert.sh  (also runs via cron)
+
+services:
+  certbot:
+    container_name: certbot-core
+    image: certbot/certbot:latest
+    volumes:
+      - ../../data/letsencrypt:/etc/letsencrypt
+      - ../../data/certbot-webroot:/var/www/certbot
+    networks:
+      - core-net
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        certbot certonly \
+          --webroot \
+          --webroot-path /var/www/certbot \
+          --non-interactive \
+          --agree-tos \
+          -m ${ADMIN_EMAIL} \
+          -d ${DOMAIN} \
+          -d api.${DOMAIN} \
+          -d kb.${DOMAIN} \
+          --cert-name ${DOMAIN}
+        if [ -e /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ]; then
+          echo "cert issued for ${DOMAIN}, api.${DOMAIN}, kb.${DOMAIN}"
+          openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -text -noout | grep -E 'Subject:|DNS:'
+          echo ""
+          openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -noout -enddate
+        else
+          echo "FAILED: cert not found at /etc/letsencrypt/live/${DOMAIN}/"
+          exit 1
+        fi
+
+networks:
+  core-net:
+    external: true

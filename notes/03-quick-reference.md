@@ -148,18 +148,29 @@ Postgres               # Docker volume on EC2 (consider RDS for production)
 Open WebUI             # Docker volume (oweb-data)
 ```
 
-## SSL Certificate Renewal
+## SSL Certificate (Let's Encrypt + Certbot)
 
-Your purchased cert has a fixed expiry. To renew:
+Certs are free from Let's Encrypt, auto-renewed by certbot via cron. Expires every 90 days.
 
 ```bash
 # Check current expiry
-openssl x509 -in data/ssl/districtsolutions.ai.crt -noout -enddate
+openssl x509 -in data/letsencrypt/live/districtsolutions.ai/cert.pem -noout -enddate
 
-# After purchasing renewal, replace cert files
-scp new-cert.crt ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/districtsolutions.ai.crt
-scp new-cert.key ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/districtsolutions.ai.key
+# Manual renewal (cron does this automatically)
+./scripts/renew-cert.sh
 
-# Reload nginx
-./scripts/restart-nginx.sh
+# Force re-issue (if something went wrong)
+./scripts/issue-cert.sh
+
+# Verify cert is active on the server
+openssl s_client -connect districtsolutions.ai:443 -servername districtsolutions.ai </dev/null 2>/dev/null | openssl x509 -noout -dates
+
+# Cert files (managed by certbot, don't edit manually)
+ls data/letsencrypt/live/districtsolutions.ai/
+# fullchain.pem  privkey.pem  cert.pem  chain.pem
+```
+
+Auto-renewal cron (should already be set up — see Step 5f):
+```cron
+0 3 1,15 * * /home/ec2-user/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
 ```

@@ -1,6 +1,6 @@
 # Nginx reverse proxy for districtsolutions.ai
-# Uses purchased SSL cert (not Let's Encrypt)
-# Cert files must be placed in data/ssl/ before starting
+# Uses Let's Encrypt certs issued by certbot (HTTP-01 challenge)
+# Issue certs first: ./scripts/issue-cert.sh
 
 services:
   nginx:
@@ -16,7 +16,8 @@ services:
       - ./conf.d:/etc/nginx/conf.d:ro
       - ./htpasswd:/etc/nginx/htpasswd:ro
       - ./html:/var/www/html:ro
-      - ../../data/ssl:/etc/nginx/ssl:ro
+      - ../../data/letsencrypt:/etc/letsencrypt:ro
+      - ../../data/certbot-webroot:/var/www/certbot:ro
       - ../../data/nginx/logs:/var/log/nginx
     networks:
       - core-net

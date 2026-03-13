@@ -150,40 +150,107 @@ dig api.districtsolutions.ai
 
 ---
 
-### Step 5: Install SSL Certificate
+### Step 5: Issue SSL Certificate (Let's Encrypt + Certbot)
 
-You purchased a cert through your DNS provider. Place the cert files on the EC2 host:
+Free auto-renewing SSL certs from Let's Encrypt using HTTP-01 challenge. No paid cert, no CSR, no `.key` file to manage — certbot handles everything. Domain stays on Namecheap DNS, no Cloudflare needed.
 
+**Prerequisites:**
+- Port 80 must be reachable from the internet (temporarily open SG if CIDR-locked)
+- DNS A records for `districtsolutions.ai`, `api.districtsolutions.ai`, `kb.districtsolutions.ai` must point to this server
+- nginx must be running (it serves the ACME challenge files)
+
+**Step 5a: Temporarily open port 80** (if SG is CIDR-locked):
+
+Let's Encrypt servers need to reach port 80 to validate domain ownership. Open it in the AWS console or update the CF template, then close it again after cert is issued (or leave it open — it only redirects to HTTPS).
+
+**Step 5b: Make sure `.env` has these values:**
 ```bash
-mkdir -p /home/ec2-user/core/data/ssl
-
-# Copy your cert files (from your local machine)
-scp districtsolutions.ai.crt ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/
-scp districtsolutions.ai.key ec2-user@34.234.159.163:/home/ec2-user/core/data/ssl/
+DOMAIN=districtsolutions.ai
+ADMIN_EMAIL=hello@districtsolutions.ai
 ```
 
-**If your provider gave you separate cert + CA bundle files:**
+**Step 5c: Start nginx first** (it serves the ACME challenge directory):
 ```bash
-# Concatenate into a single fullchain file
-cat districtsolutions.ai.crt ca-bundle.crt > data/ssl/districtsolutions.ai.crt
+cd /home/ec2-user/core
+
+# Create required directories
+mkdir -p data/letsencrypt data/certbot-webroot data/nginx/logs
+
+# Start nginx (it will fail on HTTPS until certs exist, but port 80 works)
+# For first-time setup, temporarily comment out the 443 listeners or use a self-signed cert
+# See "First-time bootstrap" below
 ```
 
-**Verify the cert:**
+**Step 5d: Issue the cert:**
 ```bash
-openssl x509 -in data/ssl/districtsolutions.ai.crt -text -noout | grep -E "Subject:|DNS:|Issuer:"
-# Should show your domain and the CA that issued it
-
-# Verify key matches cert
-openssl x509 -noout -modulus -in data/ssl/districtsolutions.ai.crt | md5sum
-openssl rsa -noout -modulus -in data/ssl/districtsolutions.ai.key | md5sum
-# Both md5sums must match
+./scripts/issue-cert.sh
 ```
 
-**Set permissions:**
-```bash
-chmod 600 data/ssl/districtsolutions.ai.key
-chmod 644 data/ssl/districtsolutions.ai.crt
+Expected output:
 ```
+=== Issuing Let's Encrypt cert for districtsolutions.ai ===
+...
+cert issued for districtsolutions.ai, api.districtsolutions.ai, kb.districtsolutions.ai
+Subject: CN = districtsolutions.ai
+DNS:api.districtsolutions.ai, DNS:districtsolutions.ai, DNS:kb.districtsolutions.ai
+```
+
+**Step 5e: Verify certs:**
+```bash
+ls data/letsencrypt/live/districtsolutions.ai/
+# Should show: cert.pem  chain.pem  fullchain.pem  privkey.pem  README
+
+openssl x509 -in data/letsencrypt/live/districtsolutions.ai/cert.pem -text -noout | grep -E "Subject:|DNS:"
+# Should show: CN=districtsolutions.ai with SANs for all 3 subdomains
+
+openssl x509 -in data/letsencrypt/live/districtsolutions.ai/cert.pem -noout -enddate
+# Should show ~90 days from now
+```
+
+**Step 5f: Set up auto-renewal** (certs expire every 90 days):
+```bash
+crontab -e
+```
+Add this line:
+```cron
+# Renew Let's Encrypt certs twice a month (certbot only renews if within 30 days of expiry)
+0 3 1,15 * * /home/ec2-user/core/scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1
+```
+
+**First-time bootstrap (chicken-and-egg problem):**
+
+nginx needs certs to start HTTPS, but certbot needs nginx running on port 80 to serve the challenge. For the very first cert issuance:
+
+```bash
+# Option A: Generate a temporary self-signed cert so nginx can start
+mkdir -p data/letsencrypt/live/districtsolutions.ai
+openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+  -keyout data/letsencrypt/live/districtsolutions.ai/privkey.pem \
+  -out data/letsencrypt/live/districtsolutions.ai/fullchain.pem \
+  -subj "/CN=districtsolutions.ai"
+
+# Start nginx (HTTPS will show cert warning, but port 80 works for ACME)
+cd stack/nginx && docker compose -f nginx.yaml up -d && cd ../..
+
+# Now issue the real cert
+./scripts/issue-cert.sh
+
+# Restart nginx to pick up the real cert
+./scripts/restart-nginx.sh
+```
+
+> **Cert files:** nginx is configured to read from `data/letsencrypt/live/districtsolutions.ai/`:
+> - `fullchain.pem` → `ssl_certificate`
+> - `privkey.pem` → `ssl_certificate_key`
+>
+> These are managed entirely by certbot. No manual key generation or Namecheap cert purchase needed.
+
+<details>
+<summary><strong>Reference: Cloudflare DNS-01 alternative (wildcard certs)</strong></summary>
+
+If you later move DNS to Cloudflare, you can use DNS-01 challenge for wildcard certs (`*.districtsolutions.ai`) without needing port 80 open. See `newk-ai/stack/certbot/` for a working implementation. This requires a Cloudflare API token with `Zone:DNS:Edit` permission.
+
+</details>
 
 ---
 
