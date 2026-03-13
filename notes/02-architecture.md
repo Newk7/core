@@ -133,7 +133,7 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
                                         (bans auth fails + bot scans + rate violations)
 ```
 
-1. **EC2 Security Group** - Only ports 22 (SSH, CIDR-locked), 80, 443 open
+1. **EC2 Security Group** - Ports 22, 80, 443 all CIDR-locked to team IPs pre-launch. At go-live, open 80/443 to 0.0.0.0/0 (keep SSH CIDR-locked). See Step 13 in 01-getting-started.md
 2. **nginx default server** - Drops connections with no matching Host header (returns 444)
 3. **nginx TLS** - TLSv1.2/1.3 with strong ECDHE ciphers, purchased cert
 4. **nginx rate limiting** - 10 req/s general, 5 req/s on auth endpoints

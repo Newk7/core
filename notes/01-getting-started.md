@@ -384,9 +384,9 @@ for i in {1..25}; do curl -so /dev/null -w "%{http_code}\n" https://districtsolu
 
 ---
 
-### Step 12: Security Group Check
+### Step 12: Security Group Check (Pre-Launch)
 
-Verify the EC2 security group only allows necessary ports:
+During development, all ports are CIDR-locked to team IPs only. Verify:
 
 ```bash
 aws ec2 describe-security-groups \
@@ -394,12 +394,50 @@ aws ec2 describe-security-groups \
   --query 'SecurityGroups[0].IpPermissions[*].{Port:FromPort,CIDR:IpRanges[0].CidrIp}'
 ```
 
-Expected:
+Expected (pre-launch):
 | Port | CIDR | Purpose |
 |------|------|---------|
 | 22 | your-ip/32 | SSH access |
-| 80 | 0.0.0.0/0 | HTTP (redirects to HTTPS) |
-| 443 | 0.0.0.0/0 | HTTPS (all services) |
+| 80 | your-ip/32 | HTTP (CIDR-locked until go-live) |
+| 443 | your-ip/32 | HTTPS (CIDR-locked until go-live) |
+
+> **Note:** The CloudFormation template (`stack/cf/build-host/host.yaml`) uses `IngressCIDR` and `IngressCIDR1` parameters to lock all ports to specific IPs. This keeps the site, API, and all services inaccessible to the public until go-live.
+
+---
+
+### Step 13: Go-Live Checklist
+
+When ready to make the site publicly accessible:
+
+1. **Open ports 80 and 443 to the public** by updating the security group. Either:
+   - Update the CloudFormation template to use `0.0.0.0/0` for HTTP/HTTPS rules (keep SSH CIDR-locked), then redeploy:
+     ```bash
+     aws cloudformation deploy \
+       --template-file stack/cf/build-host/host.yaml \
+       --stack-name AI-BizTool \
+       --capabilities CAPABILITY_NAMED_IAM \
+       --region us-east-1
+     ```
+   - Or update the security group directly in the AWS console (faster, but drifts from CF template).
+
+2. **Verify public access** from a non-whitelisted IP (e.g., mobile hotspot):
+   ```bash
+   curl -I https://districtsolutions.ai
+   # Expected: HTTP/2 200
+
+   curl -I https://api.districtsolutions.ai/health
+   # Expected: HTTP/2 200 (health is public)
+
+   curl -I https://api.districtsolutions.ai/api/v1/tasks
+   # Expected: HTTP/2 401 (basic auth still protects API endpoints)
+   ```
+
+3. **Confirm these remain protected:**
+   - SSH (port 22) — still CIDR-locked to team IPs
+   - API endpoints (`/api/v1/*`) — still behind nginx basic auth (except `/health` and `/api/v1/contact`)
+   - Open WebUI — has its own JWT login, no nginx auth needed
+
+4. **Optional: Remove nginx basic auth from API** when client apps are ready to authenticate differently. The comment in `stack/nginx/conf.d/api.districtsolutions.ai.conf` says "remove when ready to go live."
 
 ---
 
