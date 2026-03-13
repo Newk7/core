@@ -1,7 +1,7 @@
 services:
   district-web:
     build:
-      context: ../../frontend/district-web
+      context: /opt/ds/districtsolutions
       dockerfile: Dockerfile
     container_name: district-web
     hostname: district-web
