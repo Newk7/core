@@ -423,10 +423,19 @@ sudo fail2ban-client status nginx-http-auth
 # IMPORTANT: "File list:" should show nginx log paths, NOT "No file is currently monitored"
 ```
 
+**Ban thresholds:**
+
+| Jail | Trigger | Ban Duration |
+|------|---------|-------------|
+| nginx-http-auth | 3 failed logins in 5min | 24 hours |
+| nginx-botsearch | 1 probe (.env, .git, wp-admin, etc.) | **Permanent** |
+| nginx-limit-req | 5 rate limit hits in 1min | 12 hours |
+| sshd | 2 failed SSH attempts | **Permanent** |
+
 **Test fail2ban** (from another machine):
 ```bash
-# Make 6 failed auth attempts (exceeds maxretry=5)
-for i in {1..6}; do curl -sk -u wrong:wrong https://api.districtsolutions.ai; done
+# Make 4 failed auth attempts (exceeds maxretry=3)
+for i in {1..4}; do curl -sk -u wrong:wrong https://api.districtsolutions.ai; done
 
 # Check if the IP got banned (on EC2)
 sudo fail2ban-client status nginx-http-auth
@@ -434,6 +443,12 @@ sudo fail2ban-client status nginx-http-auth
 
 # Unban yourself if needed
 sudo fail2ban-client set nginx-http-auth unbanip <your-ip>
+
+# Unban from ALL jails at once
+sudo fail2ban-client unban <your-ip>
+
+# List all currently banned IPs
+sudo fail2ban-client banned
 ```
 
 **Important:** The jail.local uses `backend = auto`. Without this, fail2ban may default to the systemd journal backend and ignore the `logpath` entirely.

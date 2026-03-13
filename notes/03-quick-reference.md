@@ -24,12 +24,35 @@ docker ps
 tail -f data/nginx/logs/kb.districtsolutions.ai_access.log
 tail -f data/nginx/logs/api.districtsolutions.ai_error.log
 
-# Check fail2ban status
+# --- fail2ban ---
+# Overview of all jails
 sudo fail2ban-client status
-sudo fail2ban-client status nginx-http-auth
 
-# Unban an IP
+# Check a specific jail (banned IPs, fail count)
+sudo fail2ban-client status nginx-http-auth
+sudo fail2ban-client status nginx-botsearch
+sudo fail2ban-client status nginx-limit-req
+sudo fail2ban-client status sshd
+
+# Unban an IP from a specific jail
 sudo fail2ban-client set nginx-http-auth unbanip <IP>
+sudo fail2ban-client set nginx-botsearch unbanip <IP>
+
+# Unban an IP from ALL jails at once
+sudo fail2ban-client unban <IP>
+
+# Unban everyone (careful)
+sudo fail2ban-client unban --all
+
+# List all currently banned IPs across all jails
+sudo fail2ban-client banned
+
+# Check what fail2ban is monitoring (should show log file paths)
+sudo fail2ban-client get nginx-botsearch logpath
+
+# Reload after editing jail.local
+sudo cp stack/fail2ban/jail.local /etc/fail2ban/jail.local
+sudo systemctl restart fail2ban
 
 # Postgres CLI
 docker exec -it biz-tool-postgres psql -U biztool -d biztool

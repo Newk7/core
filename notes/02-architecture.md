@@ -139,7 +139,7 @@ Internet ──▶ DNS ──▶ EC2 Security Group ──▶ nginx ──▶ Se
 4. **nginx rate limiting** - 10 req/s general, 5 req/s on auth endpoints
 5. **nginx security headers** - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
 6. **nginx basic auth** - htpasswd on API endpoints. NOT on kb subdomain (OWU handles JWT auth)
-7. **fail2ban** - Auto-bans IPs: 5 failed auth attempts → 1hr ban, 2 bot scans → 1hr ban, 10 rate violations in 2min → 10min ban
+7. **fail2ban** - Auto-bans IPs: 3 failed auth → 24hr ban, 1 bot probe → permanent ban, 5 rate violations/1min → 12hr ban, 2 SSH fails → permanent ban
 8. **Service-level auth** - Open WebUI has its own login (JWT tokens)
 9. **AWS IAM** - EC2 instance role for S3 and SQS access (no hardcoded credentials)
 

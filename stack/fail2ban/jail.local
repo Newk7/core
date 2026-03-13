@@ -2,41 +2,48 @@
 # install on the EC2 host: sudo dnf install -y fail2ban
 # copy this file to /etc/fail2ban/jail.local
 # copy filter.d/*.conf to /etc/fail2ban/filter.d/
+# bantime = -1 means permanent ban (until manual unban)
 
 [DEFAULT]
-bantime  = 3600
+bantime  = 86400
 findtime = 600
 maxretry = 5
 backend  = auto
 banaction = iptables-multiport
 
 # --- nginx auth failures ---
+# 3 failed logins in 5 minutes = banned for 24 hours
 [nginx-http-auth]
 enabled  = true
 filter   = nginx-auth
 logpath  = /opt/ds/core/data/nginx/logs/*_error.log
-bantime  = 3600
-maxretry = 5
-findtime = 600
+bantime  = 86400
+maxretry = 3
+findtime = 300
 
 # --- bot scanners (.env, wp-admin, .git, etc.) ---
+# 1 probe = permanent ban. No legitimate user hits these paths.
 [nginx-botsearch]
 enabled  = true
 filter   = nginx-botsearch
 logpath  = /opt/ds/core/data/nginx/logs/*_access.log
-bantime  = 3600
-maxretry = 2
+bantime  = -1
+maxretry = 1
 
 # --- rate limit violations (503 from nginx limit_req) ---
+# 5 rate limit hits in 1 minute = banned for 12 hours
 [nginx-limit-req]
 enabled  = true
 filter   = nginx-limit-req
 logpath  = /opt/ds/core/data/nginx/logs/*_error.log
-bantime  = 600
-maxretry = 10
-findtime = 120
+bantime  = 43200
+maxretry = 5
+findtime = 60
 
 # --- ssh brute force ---
+# 2 failed SSH attempts = permanent ban. SSH is CIDR-locked anyway,
+# so anyone hitting this is already suspicious.
 [sshd]
 enabled  = true
-maxretry = 3
+bantime  = -1
+maxretry = 2
