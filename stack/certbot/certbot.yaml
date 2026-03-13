@@ -26,10 +26,9 @@ services:
           -m ${ADMIN_EMAIL} \
           -d ${DOMAIN} \
           -d api.${DOMAIN} \
-          -d kb.${DOMAIN} \
           --cert-name ${DOMAIN}
         if [ -e /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ]; then
-          echo "cert issued for ${DOMAIN}, api.${DOMAIN}, kb.${DOMAIN}"
+          echo "cert issued for ${DOMAIN}, api.${DOMAIN}"
           openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -text -noout | grep -E 'Subject:|DNS:'
           echo ""
           openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -noout -enddate
