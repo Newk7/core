@@ -14,7 +14,7 @@ services:
       - POSTGRES_TASK_FQDN=${POSTGRES_TASK_FQDN:-biz-tool-postgres}
       - POSTGRES_TASK_PORT=${POSTGRES_TASK_PORT:-5432}
       - POSTGRES_TASK_DB_NAME=${POSTGRES_TASK_DB_NAME:-biztool}
-      - TASK_BUCKET=${TASK_BUCKET}
+      - TASK_BUCKET=${TASK_BUCKET:-biz-tool-prod-task-data-381492049589}
       - DB_ENABLED=${DB_ENABLED:-1}
       - S3_ENABLED=${S3_ENABLED:-1}
       - SES_FROM_EMAIL=${SES_FROM_EMAIL:-hello@districtsolutions.ai}
