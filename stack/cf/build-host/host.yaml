@@ -46,6 +46,16 @@ Parameters:
     Description: The CIDR block allowed for HTTP/HTTPS/SSH access.
     Default: 71.56.174.247/32
 
+  PostgresCIDR:
+    Type: String
+    Description: CIDR allowed for direct Postgres (5432) access. Tightly scope to admin IPs only.
+    Default: 96.231.57.192/32
+
+  PostgresCIDR1:
+    Type: String
+    Description: Additional CIDR allowed for direct Postgres (5432) access.
+    Default: 71.56.174.247/32
+
 Resources:
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -81,6 +91,16 @@ Resources:
         - IpProtocol: "-1"
           CidrIp: !Ref IngressCIDR1
           Description: All traffic
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref PostgresCIDR
+          Description: Postgres direct access
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref PostgresCIDR1
+          Description: Postgres direct access
       Tags:
         - Key: Name
           Value: !Sub "biz-tool-host-sg"

@@ -1,0 +1,25 @@
+# pgAdmin4 - web-based postgres management UI
+# Runs on core-net alongside the postgres container
+# Proxied through nginx at pg.districtsolutions.ai with basic auth
+
+services:
+  pg-admin:
+    image: dpage/pgadmin4:latest
+    container_name: pg-admin
+    hostname: pg-admin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - core-net
+
+volumes:
+  pgadmin-data:
+    driver: local
+
+networks:
+  core-net:
+    external: true
