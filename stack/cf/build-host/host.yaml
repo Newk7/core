@@ -81,13 +81,13 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: !Ref IngressCIDR
-          Description: HTTP
+          CidrIp: 0.0.0.0/0
+          Description: HTTP public (nginx redirects to HTTPS; Let's Encrypt needs this)
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: !Ref IngressCIDR
-          Description: HTTPS
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS public
         - IpProtocol: "-1"
           CidrIp: !Ref IngressCIDR1
           Description: All traffic
