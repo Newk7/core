@@ -5,8 +5,8 @@ from core.log import create_log
 log = create_log(__name__)
 
 # SES config from environment
-SES_FROM = os.getenv('SES_FROM_EMAIL', 'noreply@districtsolutions.ai')
-SES_NOTIFY_TO = os.getenv('CONTACT_NOTIFY_EMAIL', 'contact@districtsolutions.ai')
+SES_FROM = os.getenv('SES_FROM_EMAIL', 'hello@districtsolutions.ai')
+SES_NOTIFY_TO = os.getenv('CONTACT_NOTIFY_EMAIL', 'hello@districtsolutions.ai')
 SES_CONFIG_SET = os.getenv('SES_CONFIG_SET', 'biz-tool-prod')
 AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 
