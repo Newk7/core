@@ -23,6 +23,7 @@
 | API | biz-tool-api | 8000 | FastAPI REST API for task pipeline + contact form |
 | Worker | biz-tool-worker | — | SQS polling task processor |
 | Postgres | biz-tool-postgres | 5432 | Task tracking database |
+| pgAdmin | pg-admin | 80 (internal) | Database management UI (pg.districtsolutions.ai) |
 | fail2ban | (host-level) | — | Auto-ban brute force + bot scans |
 
 ---
@@ -140,6 +141,8 @@ Fill in:
 HTPASSWD_PASS=<strong password for nginx basic auth>
 POSTGRES_PASSWORD=<random 32+ char string>
 POSTGRES_TASK_PW=<same as POSTGRES_PASSWORD>
+PGADMIN_EMAIL=admin@districtsolutions.ai
+PGADMIN_PASSWORD=<strong password for pgAdmin login>
 OWEB_SECRET_KEY=<random 32+ char string>
 ANTHROPIC_API_KEY=<your key>
 OPENAI_API_KEY=<your key, if using>
@@ -162,12 +165,14 @@ Add these additional A records at your DNS provider:
 | A | `@` | 34.234.159.163 | 1800 |
 | A | `kb` | 34.234.159.163 | 1800 |
 | A | `api` | 34.234.159.163 | 1800 |
+| A | `pg` | 34.234.159.163 | 1800 |
 
 **Verify:**
 ```bash
 dig districtsolutions.ai
 dig kb.districtsolutions.ai
 dig api.districtsolutions.ai
+dig pg.districtsolutions.ai
 # All should return 34.234.159.163
 ```
 
@@ -178,13 +183,14 @@ dig api.districtsolutions.ai
 Free auto-renewing SSL certs from Let's Encrypt using HTTP-01 challenge. No paid cert, no CSR, no `.key` file to manage — certbot handles everything. Domain stays on Namecheap DNS, no Cloudflare needed.
 
 **Prerequisites:**
-- Port 80 must be reachable from the internet (temporarily open SG if CIDR-locked)
-- DNS A records for `districtsolutions.ai`, `api.districtsolutions.ai`, `kb.districtsolutions.ai` must point to this server
+- Port 80 must be reachable from the internet (`0.0.0.0/0` — already set in current `host.yaml`)
+- DNS A records for all subdomains must point to this server
 - nginx must be running (it serves the ACME challenge files)
+- All upstream containers referenced in `conf.d/` must be running before nginx reload (or use `--force-recreate` to restart nginx after adding new vhosts)
 
-**Step 5a: Temporarily open port 80** (if SG is CIDR-locked):
+**Step 5a: Verify port 80 is open:**
 
-Let's Encrypt servers need to reach port 80 to validate domain ownership. Open it in the AWS console or update the CF template, then close it again after cert is issued (or leave it open — it only redirects to HTTPS).
+The current `host.yaml` has port 80/443 open to `0.0.0.0/0` — required for Let's Encrypt HTTP-01 challenge. If it's ever CIDR-locked, update the SG before running certbot.
 
 **Step 5b: Make sure `.env` has these values:**
 ```bash
@@ -213,9 +219,9 @@ Expected output:
 ```
 === Issuing Let's Encrypt cert for districtsolutions.ai ===
 ...
-cert issued for districtsolutions.ai, api.districtsolutions.ai, kb.districtsolutions.ai
+cert issued for districtsolutions.ai, api.districtsolutions.ai, pg.districtsolutions.ai
 Subject: CN = districtsolutions.ai
-DNS:api.districtsolutions.ai, DNS:districtsolutions.ai, DNS:kb.districtsolutions.ai
+DNS:api.districtsolutions.ai, DNS:districtsolutions.ai, DNS:pg.districtsolutions.ai
 ```
 
 **Step 5e: Verify certs:**
@@ -347,6 +353,11 @@ cd /opt/ds/core
 
 This starts in order: postgres → open-webui → api → worker → district-web → nginx
 
+**Start pgAdmin separately:**
+```bash
+docker compose -f stack/db/pg-admin.yaml --env-file .env up -d
+```
+
 **Verify everything is running:**
 ```bash
 docker ps
@@ -359,6 +370,7 @@ biz-tool-oweb       open-webui:latest          port 9322
 biz-tool-api        biz-tool-api               port 8000
 biz-tool-worker     biz-tool-worker            (no port)
 district-web        district-web               (internal :80)
+pg-admin            dpage/pgadmin4:latest      (internal :80)
 core-nginx          nginx:alpine               port 80, 443
 ```
 
@@ -515,33 +527,23 @@ aws ec2 describe-security-groups \
   --query 'SecurityGroups[0].IpPermissions[*].{Port:FromPort,CIDR:IpRanges[0].CidrIp}'
 ```
 
-Expected (pre-launch):
+Current SG rules:
 | Port | CIDR | Purpose |
 |------|------|---------|
-| 22 | your-ip/32 | SSH access |
-| 80 | your-ip/32 | HTTP (CIDR-locked until go-live) |
-| 443 | your-ip/32 | HTTPS (CIDR-locked until go-live) |
+| 22 | team IPs only | SSH access |
+| 80 | 0.0.0.0/0 | HTTP (redirects to HTTPS; needed for Let's Encrypt) |
+| 443 | 0.0.0.0/0 | HTTPS (public) |
+| 5432 | team IPs only | Postgres direct access (via `PostgresCIDR`/`PostgresCIDR1` params) |
 
-> **Note:** The CloudFormation template (`stack/cf/build-host/host.yaml`) uses `IngressCIDR` and `IngressCIDR1` parameters to lock all ports to specific IPs. This keeps the site, API, and all services inaccessible to the public until go-live.
+> **Note:** The CloudFormation template (`stack/cf/build-host/host.yaml`) manages these rules. Update `PostgresCIDR`/`PostgresCIDR1` parameters to change which IPs can connect directly to Postgres on port 5432.
 
 ---
 
 ### Step 13: Go-Live Checklist
 
-When ready to make the site publicly accessible:
+Ports 80/443 are already open to `0.0.0.0/0`. Go-live steps:
 
-1. **Open ports 80 and 443 to the public** by updating the security group. Either:
-   - Update the CloudFormation template to use `0.0.0.0/0` for HTTP/HTTPS rules (keep SSH CIDR-locked), then redeploy:
-     ```bash
-     aws cloudformation deploy \
-       --template-file stack/cf/build-host/host.yaml \
-       --stack-name AI-BizTool \
-       --capabilities CAPABILITY_NAMED_IAM \
-       --region us-east-1
-     ```
-   - Or update the security group directly in the AWS console (faster, but drifts from CF template).
-
-2. **Verify public access** from a non-whitelisted IP (e.g., mobile hotspot):
+1. **Verify public access** from a non-whitelisted IP (e.g., mobile hotspot):
    ```bash
    curl -I https://districtsolutions.ai
    # Expected: HTTP/2 200
@@ -575,6 +577,13 @@ docker run --rm \
 # Check logs
 docker logs core-nginx
 ```
+
+### nginx.conf changes not picked up after git pull
+`nginx.conf` is mounted as a file bind (not a directory). `git pull` replaces the file's inode, so `nginx -s reload` reads the stale inode. Fix: force-recreate the container after any `nginx.conf` change:
+```bash
+docker compose -f stack/nginx/nginx.yaml up -d --force-recreate
+```
+Changes to `conf.d/*.conf` files are picked up by `nginx -s reload` correctly (directory mount).
 
 ### SSL cert issues
 ```bash

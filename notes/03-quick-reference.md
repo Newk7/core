@@ -8,11 +8,18 @@
 
 # Restart individual services
 cd stack/db && docker compose -f db.yaml down && docker compose -f db.yaml up -d
+docker compose -f stack/db/pg-admin.yaml --env-file .env up -d   # pgAdmin
 cd stack/oweb && docker compose down && docker compose up -d
 cd stack/api && docker compose down && docker compose up -d --build
 cd stack/worker && docker compose down && docker compose up -d --build
 cd stack/district-web && docker compose down && docker compose up -d --build
 ./scripts/restart-nginx.sh
+
+# nginx reload vs force-recreate
+# conf.d/*.conf changes  → nginx -s reload is sufficient (directory mount)
+# nginx.conf changes     → must force-recreate (file bind mount, git pull changes inode)
+docker exec core-nginx nginx -s reload
+docker compose -f stack/nginx/nginx.yaml up -d --force-recreate  # after nginx.conf change
 
 # Generate htpasswd (after changing password in .env)
 ./scripts/generate-htpasswd.sh
@@ -78,6 +85,13 @@ curl -s https://api.districtsolutions.ai/health -u kevin:PASS
 | Open WebUI | https://kb.districtsolutions.ai | OWU login (no nginx auth) |
 | API | https://api.districtsolutions.ai | nginx basic auth |
 | API Health | https://api.districtsolutions.ai/health | None (exempt) |
+| pgAdmin | https://pg.districtsolutions.ai | nginx basic auth + pgAdmin login |
+
+**pgAdmin connection details** (when adding server inside pgAdmin):
+- Host: `biz-tool-postgres`
+- Port: `5432`
+- Database: `biztool`
+- Username/Password: `POSTGRES_USER` / `POSTGRES_PASSWORD` from `.env`
 
 ## API Endpoints
 
