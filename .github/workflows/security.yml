@@ -1,0 +1,73 @@
+name: Security Pipeline
+
+on:
+  push:
+    branches: ["**"]    # scan every branch on every push
+  pull_request:
+    branches:
+      - main
+      - integration
+name: Security Pipeline
+
+jobs:
+  sast:
+    name: SAST – Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep          # official image, replaces deprecated action
+    permissions:
+      security-events: write
+      contents: read
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep scan --config auto --sarif > semgrep-results.sarif
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}  # optional
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+
+  iac-scan:
+    name: IaC – Checkov
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes,cloudformation,dockerfile
+          soft_fail: true                 # warn but don't block
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+
+  secret-scan:
+    name: Secret Scan – Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # uncomment if org repo
