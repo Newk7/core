@@ -22,15 +22,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Semgrep
-        run: semgrep scan --config auto --sarif > semgrep-results.sarif || true  # soft fail
+        run: semgrep scan --config auto || true
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}  # optional
-
-      # - name: Upload Semgrep SARIF
-      #   uses: github/codeql-action/upload-sarif@v4
-      #   if: always()
-      #   with:
-      #     sarif_file: semgrep-results.sarif
 
   iac-scan:
     name: IaC – Checkov
@@ -38,7 +32,7 @@ jobs:
     permissions:
       security-events: write
       contents: read
-      actions: read                   # added to fix permissions error
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
@@ -48,14 +42,8 @@ jobs:
           directory: .
           framework: terraform,kubernetes,cloudformation,dockerfile
           soft_fail: true
-          output_format: sarif
-          output_file_path: checkov-results.sarif
-
-      # - name: Upload Checkov SARIF
-      #   uses: github/codeql-action/upload-sarif@v4
-      #   if: always()
-      #   with:
-      #     sarif_file: checkov-results.sarif
+          output_format: cli            # human-readable console output
+          quiet: false                  # show all results including passes
 
   secret-scan:
     name: Secret Scan – Gitleaks
@@ -67,7 +55,7 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true         # soft fail — won't block PR
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # uncomment if org repo
