@@ -23,15 +23,11 @@ services:
       - JWT_EXPIRES_IN=${OWEB_JWT_EXPIRES_IN:--1}
       - DATABASE_URL=${OWEB_DATABASE_URL:-sqlite:///app/backend/data/webui.db}
     volumes:
-      - oweb-data:/app/backend/data
+      - ../../data/oweb:/app/backend/data
     networks:
       - core-net
     extra_hosts:
       - host.docker.internal:host-gateway
-
-volumes:
-  oweb-data:
-    driver: local
 
 networks:
   core-net:
