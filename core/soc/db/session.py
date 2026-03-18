@@ -9,7 +9,9 @@ _engine = None
 def get_engine():
     global _engine
     if _engine is None:
-        url = os.getenv("SOC_DATABASE_URL", "postgresql://socagent:socagent@biz-tool-postgres:5432/socagent")
+        url = os.getenv("SOC_DATABASE_URL")
+        if not url:
+            raise RuntimeError("SOC_DATABASE_URL environment variable is required")
         _engine = create_engine(url)
     return _engine
 

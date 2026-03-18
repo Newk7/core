@@ -13,7 +13,7 @@ services:
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - TASK_BUCKET=${TASK_BUCKET:-biz-tool-prod-task-data-381492049589}
       # SOC database
-      - SOC_DATABASE_URL=${SOC_DATABASE_URL:-postgresql://socagent:socagent@biz-tool-postgres:5432/socagent}
+      - SOC_DATABASE_URL=${SOC_DATABASE_URL}
       # Anthropic (for LangGraph agents)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       # Azure Sentinel
