@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECR repositories for core Docker images
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+
+Resources:
+  RepoApi:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "core/${Environment}/api"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  RepoWorker:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "core/${Environment}/worker"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  RepoSocWorker:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "core/${Environment}/soc-worker"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  RepoSocWeb:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "core/${Environment}/soc-web"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  RepoDistrictWeb:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "core/${Environment}/district-web"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+Outputs:
+  ApiRepoUri:
+    Value: !GetAtt RepoApi.RepositoryUri
+  WorkerRepoUri:
+    Value: !GetAtt RepoWorker.RepositoryUri
+  SocWorkerRepoUri:
+    Value: !GetAtt RepoSocWorker.RepositoryUri
+  SocWebRepoUri:
+    Value: !GetAtt RepoSocWeb.RepositoryUri
+  DistrictWebRepoUri:
+    Value: !GetAtt RepoDistrictWeb.RepositoryUri

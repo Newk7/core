@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM policy for ECR push/pull — attach to ec2-ssm-role
+
+Parameters:
+  Region:
+    Type: String
+    Default: us-east-1
+
+Resources:
+  ECRPushPullPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: CoreECRPushPull
+      Description: Allow push and pull to core ECR repositories
+      Roles:
+        - ec2-ssm-role
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ECRAuth
+            Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+            Resource: "*"
+          - Sid: ECRPushPull
+            Effect: Allow
+            Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:DescribeImages
+              - ecr:DescribeRepositories
+              - ecr:GetDownloadUrlForLayer
+              - ecr:InitiateLayerUpload
+              - ecr:ListImages
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Resource: !Sub "arn:aws:ecr:${Region}:${AWS::AccountId}:repository/core/*"
