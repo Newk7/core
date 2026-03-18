@@ -12,6 +12,13 @@ from core.eng.resources import EngResources
 
 log = create_log('api')
 
+# SOC integration — mount if dependencies are available
+try:
+    from core.soc.api.router import soc_router
+    _soc_available = True
+except ImportError:
+    _soc_available = False
+
 app = FastAPI(title="BizTool Core API", version="0.1.0")
 
 app.add_middleware(
@@ -21,6 +28,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount SOC routes if available
+if _soc_available:
+    app.include_router(soc_router, prefix="/api/v1/soc")
+    log.info("SOC routes mounted at /api/v1/soc/")
 
 # lazy-init shared resources
 _er: Optional[EngResources] = None

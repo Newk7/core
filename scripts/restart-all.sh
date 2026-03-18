@@ -45,13 +45,25 @@ cd "$ROOT_DIR/stack/worker"
 docker compose down 2>/dev/null || true
 docker compose up -d --build
 
-# 5. district solutions website
+# 5. soc worker (LangGraph agent + scheduler)
+echo "--- starting soc-worker ---"
+cd "$ROOT_DIR/stack/soc-worker"
+docker compose down 2>/dev/null || true
+docker compose up -d --build
+
+# 6. soc web (Next.js frontend)
+echo "--- starting soc-web ---"
+cd "$ROOT_DIR/stack/soc-web"
+docker compose down 2>/dev/null || true
+docker compose up -d --build
+
+# 7. district solutions website
 echo "--- starting district-web ---"
 cd "$ROOT_DIR/stack/district-web"
 docker compose down 2>/dev/null || true
 docker compose up -d --build
 
-# 6. nginx (last - needs backends to be up)
+# 8. nginx (last - needs backends to be up)
 echo "--- starting nginx ---"
 cd "$ROOT_DIR/stack/nginx"
 docker compose -f nginx.yaml down 2>/dev/null || true

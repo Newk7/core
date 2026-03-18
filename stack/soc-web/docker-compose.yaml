@@ -1,0 +1,20 @@
+# SOC Agent frontend — Next.js dashboard at aisoc.districtsolutions.ai
+
+services:
+  soc-web:
+    build:
+      context: /opt/ds/ai-soc/soc-agent 2
+      dockerfile: /opt/ds/core/stack/soc-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ""
+    container_name: soc-web
+    hostname: soc-web
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    networks:
+      - core-net
+
+networks:
+  core-net:
+    external: true

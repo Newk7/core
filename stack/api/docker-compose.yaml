@@ -19,7 +19,10 @@ services:
       - TASK_BUCKET=${TASK_BUCKET}
       - DB_ENABLED=${DB_ENABLED:-1}
       - S3_ENABLED=${S3_ENABLED:-1}
-      - CORS_ORIGINS=${CORS_ORIGINS:-https://districtsolutions.ai,https://kb.districtsolutions.ai}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://districtsolutions.ai,https://kbaas.districtsolutions.ai,https://aisoc.districtsolutions.ai}
+      # SOC database (for SOC API routes)
+      - SOC_DATABASE_URL=${SOC_DATABASE_URL:-postgresql://socagent:socagent@biz-tool-postgres:5432/socagent}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     networks:
       - core-net
     extra_hosts:

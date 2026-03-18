@@ -41,6 +41,12 @@ def handle_task(tk: Task, er: EngResources = None, verbose: bool = False):
             # placeholder for LLM chat integration
             tk.pub_update(s=0, ds='chat processing not yet implemented')
 
+        elif job_type.startswith('soc.'):
+            log.info(f'SOC task {job_type} tk.id: {tk.id} — routed to soc-worker via SQS')
+            # soc.* tasks are consumed by the soc-worker, not this worker.
+            # If they arrive here, just acknowledge them.
+            tk.pub_update(s=0, ds=f'soc task {job_type} acknowledged')
+
         else:
             log.error(f'unsupported job type: {job_type} for tk.id: {tk.id}')
             tk.pub_update(s=-2000, ds=f'unsupported job type: {job_type}')

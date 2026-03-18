@@ -12,7 +12,7 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY core/ core/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[soc]"
 
 EXPOSE 8000
 

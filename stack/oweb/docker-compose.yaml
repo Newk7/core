@@ -10,11 +10,11 @@ services:
       - "9322:8080"
     environment:
       - WEBUI_NAME=BizTool AI
-      - WEBUI_URL=https://kb.districtsolutions.ai
+      - WEBUI_URL=https://kbaas.districtsolutions.ai
       - ENABLE_OLLAMA_API=False
       - ENABLE_OAUTH_SIGNUP=True
       - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=True
-      - CORS_ALLOW_ORIGIN=${OWEB_CORS_ALLOW_ORIGIN:-https://kb.districtsolutions.ai}
+      - CORS_ALLOW_ORIGIN=${OWEB_CORS_ALLOW_ORIGIN:-https://kbaas.districtsolutions.ai}
       - PORT=8080
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
