@@ -49,6 +49,28 @@ Production runs on a single EC2 instance with Docker Compose, nginx reverse prox
 - **Scripts use `scripts/common.sh`** — all build/restart scripts source this for shared ECR vars and helpers. Keep new scripts consistent with this pattern.
 - **Restart scripts pull from ECR** — `restart-{service}.sh` does `docker compose pull` then `up -d`. Use `--build` flag only for local fallback.
 - **Local dev scripts in `scripts/local/`** — these build locally without ECR. Use for development.
+- **Cross-platform builds** — `build-push-*.sh` scripts use `--platform linux/amd64` (set via `BUILD_PLATFORM` in `common.sh`) so images built on ARM Macs run on the x86 EC2 server.
+
+## Code vs Image Iteration
+
+Python services (api, worker, soc-worker) mount the host `core/` directory as a volume (`${CORE_DIR}/core:/app/core:ro`). This means:
+
+- **Python code changes** → `git pull` + restart the container. No rebuild needed.
+- **Dependency changes** (`pyproject.toml`) → rebuild the image and push to ECR, then restart.
+- **Dockerfile changes** → rebuild the image and push to ECR, then restart.
+
+On the server:
+```bash
+# Code-only change (fast):
+cd /opt/ds/core && git pull
+./scripts/restart-api.sh
+
+# Dependency change (rebuild required):
+./scripts/build-push-api.sh    # builds + pushes to ECR
+./scripts/restart-api.sh       # pulls new image + restarts
+```
+
+The Dockerfiles use a two-layer pattern: deps are installed first from `pyproject.toml` (cached), then code is copied. Even when rebuilding, unchanged deps are cached.
 
 ## File Organization
 

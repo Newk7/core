@@ -8,14 +8,21 @@ Three specialized ReAct agents built with LangGraph's create_react_agent.
 The supervisor (orchestrator/graph.py) decides which agents to invoke and
 synthesises their findings into a final verdict.
 """
+from core.log import log
 from langchain_anthropic import ChatAnthropic
 from langgraph.prebuilt import create_react_agent
 
 from core.soc.tools.guardduty import GUARDDUTY_TOOLS
-from core.soc.tools.sentinel import SENTINEL_TOOLS
 from core.soc.tools.wiz import WIZ_TOOLS
 from core.soc.tools.qualys import QUALYS_TOOLS
 from core.soc.tools.snyk import SNYK_TOOLS
+
+# Optional integrations — skip if deps not installed
+try:
+    from core.soc.tools.sentinel import SENTINEL_TOOLS
+except ImportError:
+    log.warning("sentinel tools unavailable (azure packages not installed)")
+    SENTINEL_TOOLS = []
 
 _model = ChatAnthropic(model="claude-sonnet-4-6", temperature=0)
 
