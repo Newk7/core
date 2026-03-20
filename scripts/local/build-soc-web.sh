@@ -7,6 +7,8 @@ if [ -n "${SOC_WEB_DIR:-}" ]; then
     true  # use explicit env var
 elif [ -d "$ROOT_DIR/../ai-soc/soc-agent/web" ]; then
     SOC_WEB_DIR="$ROOT_DIR/../ai-soc/soc-agent/web"
+elif [ -d "$ROOT_DIR/../ai-soc/soc-agent 2/web" ]; then
+    SOC_WEB_DIR="$ROOT_DIR/../ai-soc/soc-agent 2/web"
 else
     echo "ERROR: SOC web directory not found"
     echo "Set SOC_WEB_DIR to point to the ai-soc web/ directory"

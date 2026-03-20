@@ -2,10 +2,14 @@
 # local/build-district-web.sh - build the district website image locally
 source "$(dirname "$0")/../common.sh"
 
-DISTRICT_WEB_DIR="${DISTRICT_WEB_DIR:-$ROOT_DIR/../districtsolutions}"
-
-if [ ! -d "$DISTRICT_WEB_DIR" ]; then
-    echo "ERROR: District web directory not found at $DISTRICT_WEB_DIR"
+if [ -n "${DISTRICT_WEB_DIR:-}" ]; then
+    true
+elif [ -d "$ROOT_DIR/../districtsolutions" ]; then
+    DISTRICT_WEB_DIR="$ROOT_DIR/../districtsolutions"
+elif [ -d "$HOME/dir/districtsolutions" ]; then
+    DISTRICT_WEB_DIR="$HOME/dir/districtsolutions"
+else
+    echo "ERROR: District web directory not found"
     echo "Set DISTRICT_WEB_DIR to point to the districtsolutions directory"
     exit 1
 fi
