@@ -1,29 +1,23 @@
 #!/bin/bash
-# push-district-web.sh - build and push the district website image to ECR
-set -euo pipefail
+# build-push-district-web.sh - build and push the district website image to ECR
+source "$(dirname "$0")/common.sh"
 
-AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-381492049589}"
-AWS_REGION="${AWS_REGION:-us-east-1}"
-ENV_NAME="${ENV_NAME:-prod}"
-REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-REPO="core/${ENV_NAME}/district-web"
-TAG="${IMAGE_TAG:-latest}"
+TAG="${IMAGE_TAG:-$(git_tag)}"
+DISTRICT_WEB_DIR="${DISTRICT_WEB_DIR:-/opt/ds/districtsolutions}"
 
-echo "=== logging in to ECR ==="
-aws ecr get-login-password --region "$AWS_REGION" | \
-    docker login --username AWS --password-stdin "$REGISTRY"
+ecr_login
 
-echo "=== building district-web ==="
+echo "=== building district-web (from $DISTRICT_WEB_DIR) ==="
 docker build -t district-web \
-    -f /opt/ds/districtsolutions/Dockerfile \
-    /opt/ds/districtsolutions
+    -f "$DISTRICT_WEB_DIR/Dockerfile" \
+    "$DISTRICT_WEB_DIR"
 
 echo "=== tagging ==="
-docker tag district-web "$REGISTRY/$REPO:$TAG"
-docker tag district-web "$REGISTRY/$REPO:latest"
+docker tag district-web "$(ecr_image district-web "$TAG")"
+docker tag district-web "$(ecr_image district-web latest)"
 
 echo "=== pushing ==="
-docker push "$REGISTRY/$REPO:$TAG"
-docker push "$REGISTRY/$REPO:latest"
+docker push "$(ecr_image district-web "$TAG")"
+docker push "$(ecr_image district-web latest)"
 
-echo "✓ district-web pushed → $REGISTRY/$REPO:$TAG"
+echo "✓ district-web pushed → $(ecr_image district-web "$TAG")"

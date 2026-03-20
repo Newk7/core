@@ -1,12 +1,17 @@
 #!/bin/bash
-# restart-all.sh - start all core services in order
-# run from the repo root: ./scripts/restart-all.sh
+# restart-all.sh - pull latest images from ECR and start all core services in order
+# Usage: ./scripts/restart-all.sh [--build]
+#   --build  Build locally instead of pulling from ECR (fallback)
+source "$(dirname "$0")/common.sh"
 
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-
-echo "=== core restart-all ==="
+BUILD_MODE=false
+if [ "${1:-}" = "--build" ]; then
+    BUILD_MODE=true
+    echo "=== core restart-all (local build mode) ==="
+else
+    echo "=== core restart-all (ECR pull mode) ==="
+    ecr_login
+fi
 
 # create shared docker network if it doesn't exist
 docker network inspect core-net >/dev/null 2>&1 || \
@@ -17,51 +22,56 @@ mkdir -p "$ROOT_DIR/data/ssl"
 mkdir -p "$ROOT_DIR/data/nginx/logs"
 mkdir -p "$ROOT_DIR/data/oweb"
 
-# 1. postgres
-echo "--- starting postgres ---"
-cd "$ROOT_DIR/stack/db"
-docker compose -f db.yaml down 2>/dev/null || true
-docker compose -f db.yaml up -d
+# helper: restart a compose service
+restart_service() {
+    local dir="$1"
+    local compose_file="${2:-docker-compose.yaml}"
+    local name="$(basename "$dir")"
 
-# wait for postgres to be ready
+    echo "--- starting $name ---"
+    cd "$ROOT_DIR/stack/$dir"
+
+    if [ "$compose_file" != "docker-compose.yaml" ]; then
+        docker compose -f "$compose_file" down 2>/dev/null || true
+        if [ "$BUILD_MODE" = true ]; then
+            docker compose -f "$compose_file" up -d --build
+        else
+            docker compose -f "$compose_file" pull 2>/dev/null || true
+            docker compose -f "$compose_file" up -d
+        fi
+    else
+        docker compose down 2>/dev/null || true
+        if [ "$BUILD_MODE" = true ]; then
+            docker compose up -d --build
+        else
+            docker compose pull 2>/dev/null || true
+            docker compose up -d
+        fi
+    fi
+}
+
+# 1. postgres
+restart_service db db.yaml
 echo "waiting for postgres..."
 sleep 5
 
 # 2. open webui
-echo "--- starting open webui ---"
-cd "$ROOT_DIR/stack/oweb"
-docker compose down 2>/dev/null || true
-docker compose up -d
+restart_service oweb
 
 # 3. api
-echo "--- starting api ---"
-cd "$ROOT_DIR/stack/api"
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+restart_service api
 
 # 4. worker
-echo "--- starting worker ---"
-cd "$ROOT_DIR/stack/worker"
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+restart_service worker
 
-# 5. soc worker (LangGraph agent + scheduler)
-echo "--- starting soc-worker ---"
-cd "$ROOT_DIR/stack/soc-worker"
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+# 5. soc worker
+restart_service soc-worker
 
-# 6. soc web (Next.js frontend)
-echo "--- starting soc-web ---"
-cd "$ROOT_DIR/stack/soc-web"
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+# 6. soc web
+restart_service soc-web
 
-# 7. district solutions website
-echo "--- starting district-web ---"
-cd "$ROOT_DIR/stack/district-web"
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+# 7. district web
+restart_service district-web
 
 # 8. nginx (last - needs backends to be up)
 echo "--- starting nginx ---"
@@ -69,5 +79,6 @@ cd "$ROOT_DIR/stack/nginx"
 docker compose -f nginx.yaml down 2>/dev/null || true
 docker compose -f nginx.yaml up -d
 
+echo ""
 echo "=== all services started ==="
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

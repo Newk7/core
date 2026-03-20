@@ -32,9 +32,6 @@ soc = [
     "langgraph-supervisor>=0.0.10",
     "sqlalchemy>=2.0.0",
     "apscheduler>=3.10.0",
-    "azure-monitor-query>=1.4.0",
-    "azure-identity>=1.18.0",
-    "azure-mgmt-securityinsight>=2.0.0b1",
     "langsmith>=0.1.0",
     "python-dotenv>=1.0.0",
 ]

@@ -1,5 +1,6 @@
 services:
   api:
+    image: ${ECR_REGISTRY:-381492049589.dkr.ecr.us-east-1.amazonaws.com}/core/${ENV_NAME:-prod}/api:${IMAGE_TAG:-latest}
     build:
       context: ../../
       dockerfile: stack/api/Dockerfile

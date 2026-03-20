@@ -1,5 +1,6 @@
 services:
   worker:
+    image: ${ECR_REGISTRY:-381492049589.dkr.ecr.us-east-1.amazonaws.com}/core/${ENV_NAME:-prod}/worker:${IMAGE_TAG:-latest}
     build:
       context: ../../
       dockerfile: stack/worker/Dockerfile

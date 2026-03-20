@@ -1,7 +1,8 @@
 services:
   district-web:
+    image: ${ECR_REGISTRY:-381492049589.dkr.ecr.us-east-1.amazonaws.com}/core/${ENV_NAME:-prod}/district-web:${IMAGE_TAG:-latest}
     build:
-      context: /opt/ds/districtsolutions
+      context: ${DISTRICT_WEB_DIR:-/opt/ds/districtsolutions}
       dockerfile: Dockerfile
     container_name: district-web
     hostname: district-web
