@@ -7,7 +7,7 @@ TAG="${IMAGE_TAG:-$(git_tag)}"
 ecr_login
 
 echo "=== building api ==="
-docker build -t api -f "$ROOT_DIR/stack/api/Dockerfile" "$ROOT_DIR"
+docker build --platform "$BUILD_PLATFORM" -t api -f "$ROOT_DIR/stack/api/Dockerfile" "$ROOT_DIR"
 
 echo "=== tagging ==="
 docker tag api "$(ecr_image api "$TAG")"

@@ -7,7 +7,7 @@ TAG="${IMAGE_TAG:-$(git_tag)}"
 ecr_login
 
 echo "=== building soc-worker ==="
-docker build -t soc-worker -f "$ROOT_DIR/stack/soc-worker/Dockerfile" "$ROOT_DIR"
+docker build --platform "$BUILD_PLATFORM" -t soc-worker -f "$ROOT_DIR/stack/soc-worker/Dockerfile" "$ROOT_DIR"
 
 echo "=== tagging ==="
 docker tag soc-worker "$(ecr_image soc-worker "$TAG")"

@@ -21,7 +21,7 @@ fi
 ecr_login
 
 echo "=== building soc-web (from $SOC_WEB_DIR) ==="
-docker build -t soc-web \
+docker build --platform "$BUILD_PLATFORM" -t soc-web \
     -f "$ROOT_DIR/stack/soc-web/Dockerfile" \
     "$SOC_WEB_DIR"
 

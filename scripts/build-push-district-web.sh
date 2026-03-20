@@ -19,7 +19,7 @@ fi
 ecr_login
 
 echo "=== building district-web (from $DISTRICT_WEB_DIR) ==="
-docker build -t district-web \
+docker build --platform "$BUILD_PLATFORM" -t district-web \
     -f "$DISTRICT_WEB_DIR/Dockerfile" \
     "$DISTRICT_WEB_DIR"
 

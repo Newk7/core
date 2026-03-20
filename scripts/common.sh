@@ -13,6 +13,9 @@ AWS_REGION="${AWS_REGION:-us-east-1}"
 ENV_NAME="${ENV_NAME:-prod}"
 REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
+# Target platform for ECR images (server is x86_64)
+BUILD_PLATFORM="${BUILD_PLATFORM:-linux/amd64}"
+
 ecr_login() {
     echo "=== logging in to ECR ==="
     aws ecr get-login-password --region "$AWS_REGION" | \
