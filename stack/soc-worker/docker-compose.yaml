@@ -42,6 +42,8 @@ services:
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
       - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
       - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-soc-agent}
+    volumes:
+      - ${CORE_DIR:-/opt/ds/core}/core:/app/core:ro
     networks:
       - core-net
     extra_hosts:

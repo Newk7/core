@@ -24,6 +24,8 @@ services:
       # SOC database (for SOC API routes)
       - SOC_DATABASE_URL=${SOC_DATABASE_URL}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ${CORE_DIR:-/opt/ds/core}/core:/app/core:ro
     networks:
       - core-net
     extra_hosts:

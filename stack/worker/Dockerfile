@@ -9,9 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Install deps first (cached unless pyproject.toml changes)
 COPY pyproject.toml .
-COPY core/ core/
+RUN mkdir -p core && touch core/__init__.py && \
+    pip install --no-cache-dir --retries 3 --timeout 120 . && \
+    rm -rf core
 
-RUN pip install --no-cache-dir .
+# Copy app code
+COPY core/ core/
 
 CMD ["python", "-m", "core.eng.worker"]
