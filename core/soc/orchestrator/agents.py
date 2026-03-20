@@ -8,7 +8,8 @@ Three specialized ReAct agents built with LangGraph's create_react_agent.
 The supervisor (orchestrator/graph.py) decides which agents to invoke and
 synthesises their findings into a final verdict.
 """
-from core.log import log
+from core.log import create_log
+log = create_log("soc.agents")
 from langchain_anthropic import ChatAnthropic
 from langgraph.prebuilt import create_react_agent
 
