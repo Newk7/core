@@ -13,6 +13,12 @@ docker network inspect core-net >/dev/null 2>&1 || \
 mkdir -p "$ROOT_DIR/data/ssl"
 mkdir -p "$ROOT_DIR/data/nginx/logs"
 mkdir -p "$ROOT_DIR/data/oweb"
+mkdir -p "$ROOT_DIR/data/pipelines"
+mkdir -p "$ROOT_DIR/data/mattermost/data"
+mkdir -p "$ROOT_DIR/data/mattermost/logs"
+mkdir -p "$ROOT_DIR/data/mattermost/config"
+mkdir -p "$ROOT_DIR/data/mattermost/plugins"
+mkdir -p "$ROOT_DIR/data/mattermost/client-plugins"
 
 # 1. postgres
 echo "--- starting postgres ---"
@@ -22,9 +28,21 @@ docker compose -f db.yaml up -d
 echo "waiting for postgres..."
 sleep 5
 
-# 2. open webui
+# 2. pipelines
+echo "--- starting pipelines ---"
+cd "$ROOT_DIR/stack/pipelines"
+docker compose down 2>/dev/null || true
+docker compose up -d
+
+# 3. open webui
 echo "--- starting open webui ---"
 cd "$ROOT_DIR/stack/oweb"
+docker compose down 2>/dev/null || true
+docker compose up -d
+
+# 4. mattermost
+echo "--- starting mattermost ---"
+cd "$ROOT_DIR/stack/mattermost"
 docker compose down 2>/dev/null || true
 docker compose up -d
 

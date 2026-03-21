@@ -19,6 +19,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL}
+      - OPENAI_API_BASE_URLS=http://core-pipelines:9099
       - WEBUI_SECRET_KEY=${OWEB_SECRET_KEY}
       - JWT_EXPIRES_IN=${OWEB_JWT_EXPIRES_IN:--1}
       - DATABASE_URL=${OWEB_DATABASE_URL:-sqlite:///app/backend/data/webui.db}

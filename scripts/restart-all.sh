@@ -21,6 +21,12 @@ docker network inspect core-net >/dev/null 2>&1 || \
 mkdir -p "$ROOT_DIR/data/ssl"
 mkdir -p "$ROOT_DIR/data/nginx/logs"
 mkdir -p "$ROOT_DIR/data/oweb"
+mkdir -p "$ROOT_DIR/data/pipelines"
+mkdir -p "$ROOT_DIR/data/mattermost/data"
+mkdir -p "$ROOT_DIR/data/mattermost/logs"
+mkdir -p "$ROOT_DIR/data/mattermost/config"
+mkdir -p "$ROOT_DIR/data/mattermost/plugins"
+mkdir -p "$ROOT_DIR/data/mattermost/client-plugins"
 
 # helper: restart a compose service
 restart_service() {
@@ -55,25 +61,31 @@ restart_service db db.yaml
 echo "waiting for postgres..."
 sleep 5
 
-# 2. open webui
+# 2. pipelines (before oweb so it's ready when oweb starts)
+restart_service pipelines
+
+# 3. open webui
 restart_service oweb
 
-# 3. api
+# 4. mattermost
+restart_service mattermost
+
+# 5. api
 restart_service api
 
-# 4. worker
+# 6. worker
 restart_service worker
 
-# 5. soc worker
+# 7. soc worker
 restart_service soc-worker
 
-# 6. soc web
+# 8. soc web
 restart_service soc-web
 
-# 7. district web
+# 9. district web
 restart_service district-web
 
-# 8. nginx (last - needs backends to be up)
+# 10. nginx (last - needs backends to be up)
 echo "--- starting nginx ---"
 cd "$ROOT_DIR/stack/nginx"
 docker compose -f nginx.yaml down 2>/dev/null || true

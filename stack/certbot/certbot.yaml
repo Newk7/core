@@ -29,9 +29,10 @@ services:
           -d kbaas.${DOMAIN} \
           -d aisoc.${DOMAIN} \
           -d pg.${DOMAIN} \
+          -d msg.${DOMAIN} \
           --cert-name ${DOMAIN}
         if [ -e /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ]; then
-          echo "cert issued for ${DOMAIN}, api.${DOMAIN}, kbaas.${DOMAIN}, aisoc.${DOMAIN}, pg.${DOMAIN}"
+          echo "cert issued for ${DOMAIN}, api.${DOMAIN}, kbaas.${DOMAIN}, aisoc.${DOMAIN}, pg.${DOMAIN}, msg.${DOMAIN}"
           openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -text -noout | grep -E 'Subject:|DNS:'
           echo ""
           openssl x509 -in /etc/letsencrypt/live/${DOMAIN}/cert.pem -noout -enddate

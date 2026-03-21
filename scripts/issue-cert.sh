@@ -4,8 +4,8 @@
 #   1. Port 80 must be open to the internet (SG rule 0.0.0.0/0 or at least Let's Encrypt IPs)
 #   2. nginx must be running and serving /.well-known/acme-challenge/
 #   3. DNS A records for districtsolutions.ai, api.districtsolutions.ai,
-#      kbaas.districtsolutions.ai, pg.districtsolutions.ai, aisoc.districtsolutions.ai
-#      must point to this server
+#      kbaas.districtsolutions.ai, pg.districtsolutions.ai, aisoc.districtsolutions.ai,
+#      msg.districtsolutions.ai must point to this server
 #
 # Run from repo root: ./scripts/issue-cert.sh
 

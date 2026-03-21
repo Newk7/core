@@ -1,0 +1,50 @@
+# Mattermost - msg.districtsolutions.ai
+# Uses the official Mattermost image with Postgres backend.
+# Mattermost gets its own database in the shared Postgres container.
+
+services:
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: core-mattermost
+    hostname: core-mattermost
+    restart: unless-stopped
+    ports:
+      - "8065:8065"
+      - "8443:8443"
+    environment:
+      # Database - uses the shared Postgres container
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://${MM_DB_USER:-mattermost}:${MM_DB_PASSWORD}@biz-tool-postgres:5432/${MM_DB_NAME:-mattermost}?sslmode=disable
+      # Site URL
+      - MM_SERVICESETTINGS_SITEURL=https://msg.districtsolutions.ai
+      - MM_SERVICESETTINGS_LISTENADDRESS=:8065
+      # File storage - local volume (can switch to S3 later)
+      - MM_FILESETTINGS_DRIVERNAME=local
+      - MM_FILESETTINGS_DIRECTORY=/mattermost/data
+      # Logging
+      - MM_LOGSETTINGS_ENABLECONSOLE=true
+      - MM_LOGSETTINGS_CONSOLELEVEL=INFO
+      # Disable telemetry
+      - MM_LOGSETTINGS_ENABLEDIAGNOSTICS=false
+      # Email (use SES later if needed)
+      - MM_EMAILSETTINGS_SENDEMAILNOTIFICATIONS=false
+      - MM_EMAILSETTINGS_REQUIREEMAILVERIFICATION=false
+      # Plugin settings
+      - MM_PLUGINSETTINGS_ENABLEUPLOADS=true
+      # Signup
+      - MM_TEAMSETTINGS_ENABLEOPENSERVER=false
+      - TZ=America/New_York
+    volumes:
+      - ../../data/mattermost/data:/mattermost/data
+      - ../../data/mattermost/logs:/mattermost/logs
+      - ../../data/mattermost/config:/mattermost/config
+      - ../../data/mattermost/plugins:/mattermost/plugins
+      - ../../data/mattermost/client-plugins:/mattermost/client/plugins
+    networks:
+      - core-net
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+networks:
+  core-net:
+    external: true

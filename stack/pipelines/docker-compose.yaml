@@ -1,0 +1,35 @@
+# OpenWebUI Pipelines - custom model pipelines for kbaas.districtsolutions.ai
+# Runs the official pipelines server with custom pipeline files mounted in.
+# OpenWebUI connects to this via OPENAI_API_BASE_URLS pointing at pipelines:9099.
+
+services:
+  pipelines:
+    image: ghcr.io/open-webui/pipelines:main
+    container_name: core-pipelines
+    hostname: core-pipelines
+    restart: unless-stopped
+    ports:
+      - "9099:9099"
+    environment:
+      - PIPELINES_DIR=/app/pipelines
+      - PORT=9099
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GROK_API_KEY=${GROK_API_KEY:-}
+      - AWS_ACCESS_KEY_BEDROCK=${AWS_ACCESS_KEY_BEDROCK:-}
+      - AWS_SECRET_KEY_BEDROCK=${AWS_SECRET_KEY_BEDROCK:-}
+      - AWS_REGION_NAME_BEDROCK=${AWS_REGION_NAME_BEDROCK:-us-east-1}
+    volumes:
+      # mount individual pipeline files (same pattern as aic/fw-infra)
+      - ../../core/pipes/anthropic_chat.py:/app/pipelines/anthropic_chat.py
+      # persistent state for pipeline valves/config
+      - ../../data/pipelines:/app/.local
+    networks:
+      - core-net
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+networks:
+  core-net:
+    external: true
