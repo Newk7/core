@@ -27,6 +27,10 @@ mkdir -p "$ROOT_DIR/data/mattermost/logs"
 mkdir -p "$ROOT_DIR/data/mattermost/config"
 mkdir -p "$ROOT_DIR/data/mattermost/plugins"
 mkdir -p "$ROOT_DIR/data/mattermost/client-plugins"
+mkdir -p "$ROOT_DIR/data/mattermost/db"
+mkdir -p "$ROOT_DIR/data/gitea/website"
+mkdir -p "$ROOT_DIR/data/gitea/db"
+mkdir -p "$ROOT_DIR/data/gitea/redis"
 
 # helper: restart a compose service
 restart_service() {
@@ -82,10 +86,13 @@ restart_service soc-worker
 # 8. soc web
 restart_service soc-web
 
-# 9. district web
+# 9. gitea
+restart_service gitea
+
+# 10. district web
 restart_service district-web
 
-# 10. nginx (last - needs backends to be up)
+# 11. nginx (last - needs backends to be up)
 echo "--- starting nginx ---"
 cd "$ROOT_DIR/stack/nginx"
 docker compose -f nginx.yaml down 2>/dev/null || true

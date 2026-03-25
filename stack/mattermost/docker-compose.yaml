@@ -1,6 +1,5 @@
 # Mattermost - msg.districtsolutions.ai
-# Uses the official Mattermost image with Postgres backend.
-# Mattermost gets its own database in the shared Postgres container.
+# Own postgres for full isolation from the main app database
 
 services:
   mattermost:
@@ -12,9 +11,9 @@ services:
       - "8065:8065"
       - "8443:8443"
     environment:
-      # Database - uses the shared Postgres container
+      # Database - dedicated Mattermost postgres
       - MM_SQLSETTINGS_DRIVERNAME=postgres
-      - MM_SQLSETTINGS_DATASOURCE=postgres://${MM_DB_USER:-mattermost}:${MM_DB_PASSWORD}@biz-tool-postgres:5432/${MM_DB_NAME:-mattermost}?sslmode=disable
+      - MM_SQLSETTINGS_DATASOURCE=postgres://${MM_DB_USER:-mattermost}:${MM_DB_PASSWORD}@mattermost-pg:5432/${MM_DB_NAME:-mattermost}?sslmode=disable
       # Site URL
       - MM_SERVICESETTINGS_SITEURL=https://msg.districtsolutions.ai
       - MM_SERVICESETTINGS_LISTENADDRESS=:8065
@@ -40,10 +39,26 @@ services:
       - ../../data/mattermost/config:/mattermost/config
       - ../../data/mattermost/plugins:/mattermost/plugins
       - ../../data/mattermost/client-plugins:/mattermost/client/plugins
+    depends_on:
+      - mattermost-pg
     networks:
       - core-net
     extra_hosts:
       - host.docker.internal:host-gateway
+
+  mattermost-pg:
+    container_name: mattermost-pg
+    hostname: mattermost-pg
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${MM_DB_USER:-mattermost}
+      POSTGRES_PASSWORD: ${MM_DB_PASSWORD}
+      POSTGRES_DB: ${MM_DB_NAME:-mattermost}
+    volumes:
+      - ../../data/mattermost/db:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - core-net
 
 networks:
   core-net:

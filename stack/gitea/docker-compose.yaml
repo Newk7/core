@@ -1,0 +1,58 @@
+# Gitea - self-hosted git server (git.districtsolutions.ai)
+# Own postgres + redis for full isolation from the main app database
+
+services:
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    environment:
+      - DISABLE_REGISTRATION=true
+      - DB_TYPE=postgres
+      - DB_HOST=gitea-pg:5432
+      - DB_NAME=gitea
+      - DB_USER=${GITEA_DB_USER}
+      - DB_PASSWD=${GITEA_DB_PASSWORD}
+      - REDIS_HOST=gitea-redis:6379
+      - HTTP_ADDR=0.0.0.0
+      - HTTP_PORT=8080
+      - SSH_PORT=2222
+      - APP_NAME=${GITEA_APP_NAME:-District Solutions Git}
+    volumes:
+      - ../../data/gitea/website:/data
+    ports:
+      - "2222:2222"
+    restart: always
+    depends_on:
+      - gitea-pg
+      - gitea-redis
+    networks:
+      - core-net
+
+  gitea-pg:
+    container_name: gitea-pg
+    hostname: gitea-pg
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${GITEA_DB_USER}
+      POSTGRES_PASSWORD: ${GITEA_DB_PASSWORD}
+      POSTGRES_DB: gitea
+    volumes:
+      - ../../data/gitea/db:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - core-net
+
+  gitea-redis:
+    container_name: gitea-redis
+    hostname: gitea-redis
+    image: redis:latest
+    command: redis-server
+    volumes:
+      - ../../data/gitea/redis:/data
+    restart: always
+    networks:
+      - core-net
+
+networks:
+  core-net:
+    external: true

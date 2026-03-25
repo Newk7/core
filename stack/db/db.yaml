@@ -15,8 +15,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - SOC_DB_USER=${SOC_DB_USER:-socagent}
       - SOC_DB_PASSWORD=${SOC_DB_PASSWORD}
-      - MM_DB_USER=${MM_DB_USER:-mattermost}
-      - MM_DB_PASSWORD=${MM_DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
