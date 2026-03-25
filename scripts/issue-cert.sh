@@ -5,7 +5,7 @@
 #   2. nginx must be running and serving /.well-known/acme-challenge/
 #   3. DNS A records for districtsolutions.ai, api.districtsolutions.ai,
 #      kbaas.districtsolutions.ai, pg.districtsolutions.ai, aisoc.districtsolutions.ai,
-#      msg.districtsolutions.ai must point to this server
+#      msg.districtsolutions.ai, git.districtsolutions.ai must point to this server
 #
 # Run from repo root: ./scripts/issue-cert.sh
 
