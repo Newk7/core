@@ -64,6 +64,8 @@
 | `https://pg.districtsolutions.ai` | Basic auth + pgAdmin login | pg-admin:80 | pgAdmin4 database UI |
 | `https://aisoc.districtsolutions.ai` `/` | Basic auth | soc-web:3000 | AI-SOC dashboard (Next.js) |
 | `https://aisoc.districtsolutions.ai` `/api/v1/soc/*` | Basic auth | biz-tool-api:8000 | SOC API routes on core API |
+| `https://msg.districtsolutions.ai` | None (MM login) | core-mattermost:8065 | Mattermost messaging |
+| `https://git.districtsolutions.ai` | Basic auth | gitea:8080 | Gitea self-hosted git server |
 
 ## Containers
 
@@ -75,23 +77,31 @@
 | `soc-worker` | SOC worker (Python 3.11) | — | LangGraph orchestration + APScheduler + SQS consumer for SOC tasks |
 | `soc-web` | Next.js (Node 20) | 3001→3000 | AI-SOC dashboard frontend |
 | `biz-tool-oweb` | ghcr.io/open-webui | 9322→8080 | OpenWebUI — AI chat and knowledge base |
+| `core-pipelines` | ghcr.io/open-webui/pipelines | 9099 | OpenWebUI custom pipelines |
 | `biz-tool-postgres` | postgres:16-alpine | 5432 | PostgreSQL — `biztool` DB (tasks) + `socagent` DB (SOC) |
 | `pg-admin` | dpage/pgadmin4 | — | pgAdmin4 web UI |
 | `district-web` | React SPA in nginx | — | Company website |
+| `core-mattermost` | mattermost-team-edition | 8065, 8443 | Mattermost messaging platform |
+| `mattermost-pg` | postgres:17-alpine | — | Dedicated Mattermost database |
+| `gitea` | gitea/gitea | 8080, 2222 | Self-hosted git server |
+| `gitea-pg` | postgres:17-alpine | — | Dedicated Gitea database |
+| `gitea-redis` | redis | — | Gitea caching / sessions |
 
 ## Databases
 
-### biztool (core task system)
+Services that need their own database get a **dedicated postgres container** for isolation. Only tightly-coupled services share a postgres instance.
 
-Used by: `biz-tool-api`, `biz-tool-worker`
+### biz-tool-postgres (postgres:16-alpine)
+
+Shared by `biz-tool-api`, `biz-tool-worker`, `soc-worker`. Contains:
+
+**biztool** — core task system
 
 | Table | Purpose |
 |-------|---------|
 | `tasks` | Task queue metadata (uuid, type, status, timestamps) |
 
-### socagent (AI-SOC platform)
-
-Used by: `biz-tool-api` (SOC routes), `soc-worker`
+**socagent** — AI-SOC platform
 
 | Table | Purpose |
 |-------|---------|
@@ -99,6 +109,14 @@ Used by: `biz-tool-api` (SOC routes), `soc-worker`
 | `investigations` | AI agent investigation results + HITL status |
 | `assets` | Asset registry (hosts, IPs, criticality, FP patterns) |
 | `analyst_feedback` | Human analyst decisions for accuracy tracking |
+
+### mattermost-pg (postgres:17-alpine)
+
+Dedicated postgres for Mattermost. Data at `data/mattermost/db/`.
+
+### gitea-pg (postgres:17-alpine)
+
+Dedicated postgres for Gitea. Data at `data/gitea/db/`.
 
 ---
 
@@ -360,9 +378,68 @@ api.districtsolutions.ai
 kbaas.districtsolutions.ai
 aisoc.districtsolutions.ai
 pg.districtsolutions.ai
+msg.districtsolutions.ai
+git.districtsolutions.ai
 ```
 
 Issued/renewed via `scripts/issue-cert.sh` and `scripts/renew-cert.sh`. Stored at `data/letsencrypt/live/districtsolutions.ai/`.
+
+---
+
+## Adding a New Subdomain / Service
+
+Checklist for adding a new service (e.g., `foo.districtsolutions.ai`):
+
+### 1. DNS Record
+Add an A record for `foo.districtsolutions.ai` → `34.234.159.163` at your DNS provider (Namecheap).
+
+### 2. SSL Certificate
+Add the new domain to the certbot config and reissue:
+- Edit `stack/certbot/certbot.yaml` — add `-d foo.${DOMAIN}` to the certbot entrypoint
+- Run `./scripts/issue-cert.sh` to reissue with the new SAN
+- Restart nginx: `./scripts/restart-nginx.sh`
+
+### 3. Nginx Config
+Create `stack/nginx/conf.d/foo.districtsolutions.ai.conf`:
+- Copy an existing conf as a template (use `api.*.conf` for basic auth, `kbaas.*.conf` for no auth)
+- Set `server_name foo.districtsolutions.ai`
+- Set `proxy_pass` to the container's internal hostname and port
+- Add to the HTTP→HTTPS redirect `server_name` list in `stack/nginx/nginx.conf`
+
+### 4. Docker Compose
+Create `stack/foo/docker-compose.yaml`:
+- Use `core-net` as an external network
+- If the service needs a database, give it its own postgres container (not the shared `biz-tool-postgres`) — see `stack/gitea/` or `stack/mattermost/` for examples
+- Data volumes should go under `data/foo/`
+
+### 5. Environment Variables
+- Add any new env vars to `.env.example` with `changeme` defaults
+- Add the real values to `/opt/ds/env.sh` on the server
+
+### 6. Restart Script
+Update `scripts/restart-all.sh`:
+- Add `mkdir -p` for any new data directories
+- Add `restart_service foo` in the correct order (before nginx, after any dependencies)
+
+### 7. Deploy
+```bash
+cd /opt/ds/core
+git pull
+./scripts/issue-cert.sh    # reissue cert with new SAN
+./scripts/restart-all.sh   # starts everything including new service
+```
+
+### 8. Verify
+```bash
+curl -I https://foo.districtsolutions.ai
+# Should return 200 (or 401 if behind basic auth)
+```
+
+### 9. Update Documentation
+- Update the services table in `notes/01-getting-started.md`
+- Update the subdomain routing table, containers table, databases section, and port map in `notes/02-architecture.md`
+- Update the URLs table in `notes/03-quick-reference.md`
+- Add the subdomain to the DNS records table in `notes/01-getting-started.md` Step 4
 
 ---
 
@@ -383,6 +460,10 @@ Issued/renewed via `scripts/issue-cert.sh` and `scripts/renew-cert.sh`. Stored a
 | SSL certificates | `/opt/ds/core/data/letsencrypt/live/districtsolutions.ai/` |
 | Nginx logs | `/opt/ds/core/data/nginx/logs/` |
 | OpenWebUI data | `/opt/ds/core/data/oweb/` |
+| Mattermost data | `/opt/ds/core/data/mattermost/` |
+| Mattermost DB | `/opt/ds/core/data/mattermost/db/` |
+| Gitea data | `/opt/ds/core/data/gitea/website/` |
+| Gitea DB | `/opt/ds/core/data/gitea/db/` |
 | Environment secrets | `/opt/ds/env.sh` |
 
 ## Port Map
@@ -391,12 +472,15 @@ Issued/renewed via `scripts/issue-cert.sh` and `scripts/renew-cert.sh`. Stored a
 |------|---------|----------|
 | 80 | nginx (HTTP → HTTPS redirect + ACME challenge) | Public |
 | 443 | nginx (HTTPS) | Public |
+| 2222 | Gitea SSH | Public (git clone via SSH) |
 | 8000 | BizTool API (FastAPI) | Docker network (via nginx) |
 | 8080 | Open WebUI | Docker network (via nginx) |
 | 9322 | Open WebUI (host mapping) | localhost / LAN |
+| 9099 | Pipelines | Docker network |
+| 8065 | Mattermost | Docker network (via nginx) |
 | 3000 | SOC Web (Next.js) | Docker network (via nginx) |
 | 3001 | SOC Web (host mapping) | localhost / LAN |
-| 5432 | Postgres | CIDR-locked in SG + Docker network |
+| 5432 | Postgres (biztool + socagent) | CIDR-locked in SG + Docker network |
 | 80 | district-web (internal) | Docker network (via nginx) |
 | 80 | pg-admin (internal) | Docker network (via nginx) |
 | 22 | SSH | CIDR-locked in SG |

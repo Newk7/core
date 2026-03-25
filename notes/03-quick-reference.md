@@ -82,10 +82,14 @@ curl -s https://api.districtsolutions.ai/health -u kevin:PASS
 | Service | URL | Auth |
 |---------|-----|------|
 | Website | https://districtsolutions.ai | None (public) |
-| Open WebUI | https://kb.districtsolutions.ai | OWU login (no nginx auth) |
+| Open WebUI | https://kbaas.districtsolutions.ai | OWU login (no nginx auth) |
 | API | https://api.districtsolutions.ai | nginx basic auth |
 | API Health | https://api.districtsolutions.ai/health | None (exempt) |
+| AI-SOC | https://aisoc.districtsolutions.ai | nginx basic auth |
 | pgAdmin | https://pg.districtsolutions.ai | nginx basic auth + pgAdmin login |
+| Mattermost | https://msg.districtsolutions.ai | MM login (no nginx auth) |
+| Gitea | https://git.districtsolutions.ai | nginx basic auth |
+| Gitea SSH | `ssh://git@git.districtsolutions.ai:2222` | SSH key |
 
 **pgAdmin connection details** (when adding server inside pgAdmin):
 - Host: `biz-tool-postgres`

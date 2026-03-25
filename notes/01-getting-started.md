@@ -19,11 +19,19 @@
 |---------|-----------|------|---------|
 | nginx | core-nginx | 80, 443 | TLS termination, reverse proxy, basic auth |
 | Website | district-web | 80 (internal) | Company website SPA (districtsolutions.ai) |
-| Open WebUI | biz-tool-oweb | 9322 → 8080 | AI chat / knowledge base (kb.districtsolutions.ai) |
+| Open WebUI | biz-tool-oweb | 9322 → 8080 | AI chat / knowledge base (kbaas.districtsolutions.ai) |
+| Pipelines | core-pipelines | 9099 | OpenWebUI custom pipelines |
 | API | biz-tool-api | 8000 | FastAPI REST API for task pipeline + contact form |
 | Worker | biz-tool-worker | — | SQS polling task processor |
-| Postgres | biz-tool-postgres | 5432 | Task tracking database |
+| SOC Worker | soc-worker | — | LangGraph orchestration + scheduler |
+| SOC Web | soc-web | 3000 | AI-SOC dashboard (aisoc.districtsolutions.ai) |
+| Postgres | biz-tool-postgres | 5432 | Core + SOC databases (biztool, socagent) |
 | pgAdmin | pg-admin | 80 (internal) | Database management UI (pg.districtsolutions.ai) |
+| Mattermost | core-mattermost | 8065 | Messaging platform (msg.districtsolutions.ai) |
+| Mattermost DB | mattermost-pg | — | Dedicated Mattermost postgres |
+| Gitea | gitea | 8080, 2222 | Self-hosted git (git.districtsolutions.ai) |
+| Gitea DB | gitea-pg | — | Dedicated Gitea postgres |
+| Gitea Redis | gitea-redis | — | Gitea caching |
 | fail2ban | (host-level) | — | Auto-ban brute force + bot scans |
 
 ---
@@ -163,9 +171,12 @@ Add these additional A records at your DNS provider:
 | Type | Name | Content | TTL |
 |------|------|---------|-----|
 | A | `@` | 34.234.159.163 | 1800 |
-| A | `kb` | 34.234.159.163 | 1800 |
+| A | `kbaas` | 34.234.159.163 | 1800 |
 | A | `api` | 34.234.159.163 | 1800 |
 | A | `pg` | 34.234.159.163 | 1800 |
+| A | `aisoc` | 34.234.159.163 | 1800 |
+| A | `msg` | 34.234.159.163 | 1800 |
+| A | `git` | 34.234.159.163 | 1800 |
 
 **Verify:**
 ```bash

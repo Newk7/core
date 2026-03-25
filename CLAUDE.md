@@ -17,7 +17,7 @@ Production runs on a single EC2 instance with Docker Compose, nginx reverse prox
 - **Single EC2 host** — all containers run on one machine via Docker Compose. No Kubernetes, no ECS.
 - **ECR for images** — custom images are built, pushed to ECR, then pulled on the server. Never store large images locally long-term. See `scripts/build-push-*.sh`.
 - **SQS for async work** — tasks are dispatched via SQS, not background threads or Celery. The worker long-polls SQS.
-- **Postgres for state** — two databases in one Postgres container: `biztool` (tasks) and `socagent` (SOC). No other databases.
+- **Postgres for state** — core app uses one shared Postgres container (`biz-tool-postgres`) with `biztool` and `socagent` databases. Independent services (Mattermost, Gitea) get their own dedicated Postgres containers for isolation.
 - **S3 for artifacts** — task results, manifests, and parquet files go to S3. Never store large files in Postgres.
 - **nginx handles TLS, auth, and routing** — services expose internal ports only. nginx terminates SSL and applies basic auth where needed.
 
@@ -104,8 +104,9 @@ notes/                   # Architecture docs
 
 - Do not add dependencies to the base `[project.dependencies]` that are only needed by SOC. Use `[project.optional-dependencies.soc]`.
 - Do not hardcode paths like `/opt/ds/...` in Python code. Use environment variables.
-- Do not create new databases or database users. Use `biztool` or `socagent`.
+- Do not add databases to `biz-tool-postgres`. Core app uses `biztool` and `socagent` only. New services get their own dedicated Postgres container (see `stack/gitea/` or `stack/mattermost/` for the pattern).
 - Do not expose container ports to the host unless absolutely necessary. Services communicate via `core-net`.
 - Do not modify nginx configs without understanding the fail2ban integration — auth failure logs are parsed by fail2ban jails.
 - Do not use `docker compose up --build` in production scripts. Always pull from ECR.
 - Do not add Python type stubs, docstring-only changes, or formatting-only changes to files you aren't modifying for functional reasons.
+- Do not add a new subdomain without following the full checklist in `notes/02-architecture.md` § "Adding a New Subdomain / Service" — DNS, SSL cert, nginx config, docker-compose, env vars, restart script, and documentation updates.
